@@ -4,6 +4,12 @@ TypeScript/JavaScript SDK for the Basis DeFi protocol on BNB Chain.
 
 265 methods covering trading, token creation, prediction markets, lending, staking, vesting, social, and AI agent identity — designed for both humans and AI agents.
 
+## Requirements
+
+- Node.js 18+
+- A BSC wallet private key (for write operations)
+- ~$1 of BNB for gas fees
+
 ## Install
 
 ```bash
