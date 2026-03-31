@@ -104,7 +104,7 @@ USDB is a test stablecoin — zero financial risk. Every action earns airdrop po
 
 - Platform: https://launchonbasis.com
 - Full SDK Docs: https://launchonbasis.com/sdk-docs/COMPLETE.md
-- API Reference: See `API.md` in this repo
+- API Reference: https://launchonbasis.com/api-docs
 
 ## License
 
