@@ -8,7 +8,6 @@ TypeScript/JavaScript SDK for the Basis DeFi protocol on BNB Chain.
 
 - Node.js 18+
 - A BSC wallet private key (for write operations)
-- ~$1 of BNB for gas fees
 
 ## Install
 
