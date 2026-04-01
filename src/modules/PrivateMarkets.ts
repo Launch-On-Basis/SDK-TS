@@ -33,7 +33,7 @@ export class PrivateMarketsModule {
         functionName: 'approve',
         args: [spender, amount],
       });
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -104,7 +104,7 @@ export class PrivateMarketsModule {
       value: feeAmount,
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -214,7 +214,7 @@ export class PrivateMarketsModule {
       args: [marketToken, outcomeId, inputToken, inputAmount, minUsdb, minShares],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -238,7 +238,7 @@ export class PrivateMarketsModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -262,7 +262,7 @@ export class PrivateMarketsModule {
       args: [marketToken, outcomeId, amount, pricePerShare],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
@@ -286,7 +286,7 @@ export class PrivateMarketsModule {
       args: [marketToken, orderId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
@@ -316,7 +316,7 @@ export class PrivateMarketsModule {
       args: [marketToken, orderId, fill],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
@@ -343,7 +343,7 @@ export class PrivateMarketsModule {
       args: [marketToken, orderIds, usdbAmount],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
@@ -377,7 +377,7 @@ export class PrivateMarketsModule {
       args: [marketToken, outcomeId, orderIds, inputToken, totalInput, minShares],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
@@ -402,7 +402,7 @@ export class PrivateMarketsModule {
       args: [marketToken, outcomeId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -426,7 +426,7 @@ export class PrivateMarketsModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -450,7 +450,7 @@ export class PrivateMarketsModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -474,7 +474,7 @@ export class PrivateMarketsModule {
       args: [marketToken, voter, status],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -498,7 +498,7 @@ export class PrivateMarketsModule {
       args: [marketToken, buyers, status],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -522,7 +522,7 @@ export class PrivateMarketsModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);
@@ -546,7 +546,7 @@ export class PrivateMarketsModule {
       args: [marketToken, wallets, amount, tag, status],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this._syncTx(hash);

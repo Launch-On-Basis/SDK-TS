@@ -1,7 +1,56 @@
-import { createPublicClient, createWalletClient, http, PublicClient, WalletClient, Address } from 'viem';
+import { createPublicClient, createWalletClient, http, custom, PublicClient, WalletClient, Address } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { bsc } from 'viem/chains';
 import { SiweMessage } from 'siwe';
+
+const MEGAFUEL_RPC = 'https://bsc-megafuel.nodereal.io/';
+
+/**
+ * Creates a viem transport that tries gasless (megafuel) first for sends,
+ * falls back to regular RPC on failure. Reads always go to regular RPC.
+ */
+function createGaslessTransport(rpcUrl: string) {
+  const regularTransport = http(rpcUrl);
+
+  return custom({
+    async request({ method, params }) {
+      const transport = regularTransport({ chain: bsc });
+
+      if (method === 'eth_sendRawTransaction') {
+        // Try megafuel first (the tx is signed with gasPrice: 0)
+        try {
+          const megafuelRes = await fetch(MEGAFUEL_RPC, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 }),
+          });
+          const megafuelResult = await megafuelRes.json();
+          if (!megafuelResult.error) {
+            return megafuelResult.result;
+          }
+        } catch {}
+
+        // Megafuel rejected — throw a specific error so the SDK can catch and retry
+        const err = new Error('GASLESS_REJECTED');
+        (err as any).code = 'GASLESS_REJECTED';
+        throw err;
+      }
+
+      // For gasPrice: return 0 so viem signs the tx with zero gas
+      if (method === 'eth_gasPrice') {
+        return '0x0';
+      }
+
+      // For maxFeePerGas queries: also return 0
+      if (method === 'eth_maxPriorityFeePerGas') {
+        return '0x0';
+      }
+
+      // Everything else goes to regular RPC
+      return transport.request({ method, params } as any);
+    },
+  });
+}
 
 import { BasisAPI } from './api';
 import { FactoryModule } from './modules/Factory';
@@ -23,6 +72,7 @@ export interface BasisClientOptions {
   privateKey?: `0x${string}`;
   apiKey?: string;
   apiDomain?: string;
+  gasless?: boolean;
 
   // Contract Addresses
   factoryAddress?: Address;
@@ -48,6 +98,7 @@ export interface BasisClientOptions {
 export class BasisClient {
   public publicClient: PublicClient;
   public walletClient?: WalletClient;
+  private _fallbackWalletClient?: WalletClient;
   public apiDomain: string;
   public usdbAddress: Address;
   public mainTokenAddress: Address;
@@ -74,6 +125,28 @@ export class BasisClient {
   private _sessionCookie: string | null = null;
   private _apiKey: string | null = null;
 
+  /**
+   * Write a contract call with automatic gasless fallback.
+   * Tries megafuel (gasless) first. If rejected, retries with regular RPC.
+   */
+  async writeContract(request: any): Promise<`0x${string}`> {
+    if (!this.walletClient) throw new Error('Wallet required for write operations.');
+
+    try {
+      return await this.walletClient.writeContract(request);
+    } catch (e: any) {
+      // If gasless was rejected and we have a fallback, retry with regular gas
+      if (this._fallbackWalletClient && (
+        e.code === 'GASLESS_REJECTED' ||
+        e.message?.includes('GASLESS_REJECTED') ||
+        e.details?.includes('GASLESS_REJECTED')
+      )) {
+        return await this._fallbackWalletClient.writeContract(request);
+      }
+      throw e;
+    }
+  }
+
   /** Session cookie for authenticated API requests. */
   get sessionCookie(): string | null {
     return this._sessionCookie;
@@ -95,11 +168,28 @@ export class BasisClient {
 
     if (options.privateKey) {
       const account = privateKeyToAccount(options.privateKey);
-      this.walletClient = createWalletClient({
-        account,
-        chain: bsc,
-        transport: http(rpcUrl),
-      });
+      const gasless = options.gasless !== false; // default: true
+
+      if (gasless) {
+        // Primary: gasless transport (megafuel)
+        this.walletClient = createWalletClient({
+          account,
+          chain: bsc,
+          transport: createGaslessTransport(rpcUrl),
+        });
+        // Fallback: regular RPC for when megafuel rejects
+        this._fallbackWalletClient = createWalletClient({
+          account,
+          chain: bsc,
+          transport: http(rpcUrl),
+        });
+      } else {
+        this.walletClient = createWalletClient({
+          account,
+          chain: bsc,
+          transport: http(rpcUrl),
+        });
+      }
     }
 
     if (options.apiKey) {
@@ -372,7 +462,7 @@ export class BasisClient {
       args: [referrer],
     });
 
-    const hash = await this.walletClient.writeContract(request);
+    const hash = await this.writeContract(request);
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
     return { hash, receipt };
@@ -397,7 +487,7 @@ export class BasisClient {
       args: [referrer],
     });
 
-    const hash = await this.walletClient.writeContract(request);
+    const hash = await this.writeContract(request);
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
     return { hash, receipt };

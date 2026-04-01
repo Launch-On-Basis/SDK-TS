@@ -48,7 +48,7 @@ export class PredictionMarketsModule {
         args: [this.marketTradingAddress, amount],
       });
 
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -98,7 +98,7 @@ export class PredictionMarketsModule {
       value: feeAmount,
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -207,7 +207,7 @@ export class PredictionMarketsModule {
       args: [marketToken, outcomeId, inputToken, inputAmount, minUsdb, minShares],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -230,7 +230,7 @@ export class PredictionMarketsModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -364,7 +364,7 @@ export class PredictionMarketsModule {
       args: [marketToken, outcomeId, orderIds, inputToken, totalInput, minShares],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);

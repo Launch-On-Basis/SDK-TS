@@ -99,7 +99,7 @@ export class TaxesModule {
       functionName: 'startSurgeTax',
       args: [startRate, endRate, duration, token],
     });
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return { hash, receipt };
@@ -119,7 +119,7 @@ export class TaxesModule {
       functionName: 'endSurgeTax',
       args: [token],
     });
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return { hash, receipt };
@@ -139,7 +139,7 @@ export class TaxesModule {
       functionName: 'addDevShare',
       args: [token, wallet, basisPoints],
     });
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return { hash, receipt };
@@ -159,7 +159,7 @@ export class TaxesModule {
       functionName: 'removeDevShare',
       args: [token, wallet],
     });
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return { hash, receipt };

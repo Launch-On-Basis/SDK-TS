@@ -67,7 +67,7 @@ export class FactoryModule {
       value: feeAmount,
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     return { hash, receipt };
@@ -170,7 +170,7 @@ export class FactoryModule {
       functionName: 'DisableFreeze',
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return receipt;
@@ -189,7 +189,7 @@ export class FactoryModule {
       args: [wallets, amount, tag],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return receipt;
@@ -269,7 +269,7 @@ export class FactoryModule {
       abi: FactoryTokenArtifact.abi,
       functionName: 'claimRewards',
     });
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return { hash, receipt };
@@ -312,7 +312,7 @@ export class FactoryModule {
       args: [wallet],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return receipt;

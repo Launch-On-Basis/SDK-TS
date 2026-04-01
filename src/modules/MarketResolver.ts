@@ -40,7 +40,7 @@ export class MarketResolverModule {
         functionName: 'approve',
         args: [spender, amount],
       });
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -73,7 +73,7 @@ export class MarketResolverModule {
       args: [marketToken, outcomeId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -104,7 +104,7 @@ export class MarketResolverModule {
       args: [marketToken, newOutcomeId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -127,7 +127,7 @@ export class MarketResolverModule {
       args: [marketToken, outcomeId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -158,7 +158,7 @@ export class MarketResolverModule {
       args: [token],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -181,7 +181,7 @@ export class MarketResolverModule {
       args: [token],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -204,7 +204,7 @@ export class MarketResolverModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -227,7 +227,7 @@ export class MarketResolverModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -258,7 +258,7 @@ export class MarketResolverModule {
       args: [marketToken, proposedOutcome],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -281,7 +281,7 @@ export class MarketResolverModule {
       args: [marketToken],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -304,7 +304,7 @@ export class MarketResolverModule {
       args: [marketToken, round],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);

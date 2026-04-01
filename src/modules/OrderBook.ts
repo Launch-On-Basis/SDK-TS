@@ -29,7 +29,7 @@ export class OrderBookModule {
         functionName: 'approve',
         args: [this.marketTradingAddress, amount],
       });
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -50,7 +50,7 @@ export class OrderBookModule {
       args: [marketToken, outcomeId, amount, pricePerShare],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     // Sync order to backend database
@@ -75,7 +75,7 @@ export class OrderBookModule {
       args: [marketToken, orderId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
@@ -104,7 +104,7 @@ export class OrderBookModule {
       args: [marketToken, orderId, fill],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
@@ -131,7 +131,7 @@ export class OrderBookModule {
       args: [marketToken, orderIds, usdbAmount],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);

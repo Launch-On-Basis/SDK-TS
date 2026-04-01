@@ -40,7 +40,7 @@ export class LoansModule {
         functionName: 'approve',
         args: [spender, amount],
       });
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -64,7 +64,7 @@ export class LoansModule {
       args: [ecosystem, collateral, amount, daysCount],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -97,7 +97,7 @@ export class LoansModule {
       args: [hubId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -134,7 +134,7 @@ export class LoansModule {
       args: [hubId, addDays, payInStable, refinance],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -157,7 +157,7 @@ export class LoansModule {
       args: [hubId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -200,7 +200,7 @@ export class LoansModule {
       args: [hubId, amountToAdd],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -226,7 +226,7 @@ export class LoansModule {
       args: [hubId, percentage, isLeverage, minOut],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     this._syncTx(hash);
     return { hash, receipt };

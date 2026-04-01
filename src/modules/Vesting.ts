@@ -40,7 +40,7 @@ export class VestingModule {
         functionName: 'approve',
         args: [spender, amount],
       });
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -90,7 +90,7 @@ export class VestingModule {
       value: feeAmount,
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -125,7 +125,7 @@ export class VestingModule {
       value: feeAmount,
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -149,7 +149,7 @@ export class VestingModule {
       args: [vestingId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -173,7 +173,7 @@ export class VestingModule {
       args: [vestingId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -209,7 +209,7 @@ export class VestingModule {
       args: [vestingId],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -274,7 +274,7 @@ export class VestingModule {
       value: feeAmount,
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -312,7 +312,7 @@ export class VestingModule {
       value: feeAmount,
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -336,7 +336,7 @@ export class VestingModule {
       args: [vestingId, newBeneficiary],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -360,7 +360,7 @@ export class VestingModule {
       args: [vestingId, additionalDays],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -390,7 +390,7 @@ export class VestingModule {
       args: [vestingId, additionalAmount],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -414,7 +414,7 @@ export class VestingModule {
       args: [vestingId, newCreator],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);

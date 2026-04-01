@@ -40,7 +40,7 @@ export class StakingModule {
         functionName: 'approve',
         args: [spender, amount],
       });
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -65,7 +65,7 @@ export class StakingModule {
       args: [amount],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -88,7 +88,7 @@ export class StakingModule {
       args: [shares, claimUSDB, minUSDB],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -114,7 +114,7 @@ export class StakingModule {
       args: [shares],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -137,7 +137,7 @@ export class StakingModule {
       args: [shares],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -161,7 +161,7 @@ export class StakingModule {
       args: [stasisAmountToBorrow, days],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -194,7 +194,7 @@ export class StakingModule {
       functionName: 'repay',
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -230,7 +230,7 @@ export class StakingModule {
       args: [daysToAdd, payInUSDB, refinance],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -313,7 +313,7 @@ export class StakingModule {
       args: [additionalStasisToBorrow],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -335,7 +335,7 @@ export class StakingModule {
       functionName: 'settleLiquidation',
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);

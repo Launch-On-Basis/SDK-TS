@@ -55,7 +55,7 @@ export class TradingModule {
         args: [this.swapAddress, amount],
       });
 
-      const hash = await this.client.walletClient.writeContract(request);
+      const hash = await this.client.writeContract(request);
       await this.client.publicClient.waitForTransactionReceipt({ hash });
     }
   }
@@ -99,7 +99,7 @@ export class TradingModule {
       args: [amount, minOut, path, wrapTokens],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -129,7 +129,7 @@ export class TradingModule {
       args: [amount, minOut, path, swapToETH],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -203,7 +203,7 @@ export class TradingModule {
       args: [amount, minOut, path, numberOfDays],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
@@ -227,7 +227,7 @@ export class TradingModule {
       args: [loanId, percentage, isLeverage, minOut],
     });
 
-    const hash = await this.client.walletClient.writeContract(request);
+    const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     this._syncTx(hash);
