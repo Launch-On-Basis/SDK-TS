@@ -506,26 +506,39 @@ var BasisAPI = class {
     }
     return res.json();
   }
-  /**
-   * POST /api/v1/sync/faucet — sync a faucet claim transaction for referral tracking.
-   * No authentication required. Rate limited to 20 req/min.
-   */
-  async syncFaucet(txHash) {
-    const url = `${this.client.apiDomain}/api/v1/sync/faucet`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ txHash })
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Faucet sync failed [${res.status}]: ${body}`);
-    }
-    return res.json();
-  }
   /** @deprecated Use syncTransaction() instead */
   async syncLoan(txHash) {
     return this.syncTransaction(txHash);
+  }
+  // -----------------------------------------------------------------------
+  // Faucet (session required)
+  // -----------------------------------------------------------------------
+  /**
+   * GET /api/v1/faucet/status — check faucet eligibility and signal breakdown.
+   * Requires SIWE session. The wallet is determined from the session.
+   */
+  async getFaucetStatus() {
+    const res = await this.fetchWithSession("/api/v1/faucet/status");
+    return res.json();
+  }
+  /**
+   * POST /api/v1/faucet/claim — claim daily USDB from the treasury.
+   * Requires SIWE session. Amount is based on active signals (max 500 USDB/day).
+   * 24-hour cooldown between claims.
+   *
+   * @param referrer - Optional referrer wallet address for the referral system.
+   */
+  async claimFaucet(referrer) {
+    const body = {};
+    if (referrer) {
+      body.referrer = referrer;
+    }
+    const res = await this.fetchWithSession("/api/v1/faucet/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    return res.json();
   }
   // -----------------------------------------------------------------------
   // Loans, Vault & Vesting read endpoints (session or API key)
@@ -2820,10 +2833,7 @@ var FactoryModule = class {
     } else {
       throw new Error("Could not extract token address from creation logs.");
     }
-    let imageUrl;
-    if (options.imageUrl) {
-      imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, tokenAddress);
-    }
+    const imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, tokenAddress);
     const metadata = await this.client.api.updateMetadata({
       address: tokenAddress,
       description: options.description,
@@ -5682,10 +5692,7 @@ var PredictionMarketsModule = class {
     } else {
       throw new Error("Could not extract market address from creation logs.");
     }
-    let imageUrl;
-    if (options.imageUrl) {
-      imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, marketTokenAddress);
-    }
+    const imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, marketTokenAddress);
     const metadata = await this.client.api.updateMetadata({
       address: marketTokenAddress,
       description: options.description,
@@ -13390,10 +13397,7 @@ var PrivateMarketsModule = class {
     } else {
       throw new Error("Could not extract market address from creation logs.");
     }
-    let imageUrl;
-    if (options.imageUrl) {
-      imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, marketTokenAddress);
-    }
+    const imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, marketTokenAddress);
     const metadata = await this.client.api.updateMetadata({
       address: marketTokenAddress,
       description: options.description,
@@ -16360,6 +16364,21 @@ function createGaslessTransport(rpcUrl) {
     }
   });
 }
+var DEFAULT_ADDRESSES = {
+  factory: "0xB6BA282f29A7C67059f4E9D0898eE58f5C79960D",
+  swap: "0x9F9cF98F68bDbCbC5cf4c6402D53cEE1D180715f",
+  marketTrading: "0x396216fc9d2c220afD227B59097cf97B7dEaCb57",
+  loanHub: "0xFe19644d52fD0014EBa40c6A8F4Bfee4Ce3B2449",
+  vesting: "0xedd987c7723B9634b0Aa6161258FED3e89F9094C",
+  usdb: "0x42bcF288e51345c6070F37f30332ee5090fC36BF",
+  mainToken: "0x3067ce754a36d0a2A1b215C4C00315d9Da49EF15",
+  staking: "0x1FE7189270fb93c32a1fEfA71d1795c05C41cb33",
+  resolver: "0xB5FFCCB422531Cf462ec430170f85d8dD3dC3f57",
+  privateMarket: "0x28675A82ee3c2e6d2C85887Ea587FbDD3E3C86EE",
+  reader: "0xF406cA6403c57Ad04c8E13F4ae87b3732daa087d",
+  leverage: "0xeffb140d821c5B20EFc66346Cf414EeAC8A8FDB2",
+  taxes: "0x4501d1279273c44dA483842ED17b5451e7d3A601"
+};
 var BasisClient = class _BasisClient {
   publicClient;
   walletClient;
@@ -16441,13 +16460,13 @@ var BasisClient = class _BasisClient {
     if (options.apiKey) {
       this._apiKey = options.apiKey;
     }
-    const factoryAddr = options.factoryAddress || "0x13b32CcB24F1fd070cE8Ee5EA83AAC5a60f853DA";
-    const swapAddr = options.swapAddress || "0xD9C99E3E92c5Cb303371223FAaA3C8f5FeE39399";
-    const marketTradingAddr = options.marketTradingAddress || "0xcf8368E674A13662BA55F98bdb9A6FBC6aCEbEeE";
-    const loanHubAddr = options.loanHubAddress || "0x4d3ca2DA5F77FA8c0D0CA53b4078D025519b6d8f";
-    const vestingAddr = options.vestingAddress || "0xd27d9999b360f1D9c1Fb88F91d038D9d674f127b";
-    this.usdbAddress = options.usdbAddress || "0x1b2b5D36e5F07BD6a272F95079590B70AdB776b1";
-    this.mainTokenAddress = options.mainTokenAddress || "0x4B01013aC1F3501c64DFC7bC08aE5E23F391b5EA";
+    const factoryAddr = options.factoryAddress || DEFAULT_ADDRESSES.factory;
+    const swapAddr = options.swapAddress || DEFAULT_ADDRESSES.swap;
+    const marketTradingAddr = options.marketTradingAddress || DEFAULT_ADDRESSES.marketTrading;
+    const loanHubAddr = options.loanHubAddress || DEFAULT_ADDRESSES.loanHub;
+    const vestingAddr = options.vestingAddress || DEFAULT_ADDRESSES.vesting;
+    this.usdbAddress = options.usdbAddress || DEFAULT_ADDRESSES.usdb;
+    this.mainTokenAddress = options.mainTokenAddress || DEFAULT_ADDRESSES.mainToken;
     this.api = new BasisAPI(this);
     this.factory = new FactoryModule(this, factoryAddr);
     this.trading = new TradingModule(this, swapAddr);
@@ -16455,18 +16474,12 @@ var BasisClient = class _BasisClient {
     this.orderBook = new OrderBookModule(this, marketTradingAddr);
     this.loans = new LoansModule(this, loanHubAddr);
     this.vesting = new VestingModule(this, vestingAddr);
-    const stakingAddr = options.stakingAddress || "0xb956d467D95a16f660aaBF25c5dE81A897254332";
-    this.staking = new StakingModule(this, stakingAddr);
-    const resolverAddr = options.resolverAddress || "0xDCE6daaE48Ec55977D22BB9D855BF7ef222077cf";
-    this.resolver = new MarketResolverModule(this, resolverAddr);
-    const privateMarketAddr = options.privateMarketAddress || "0xe9aA86286bE3b353241091910FB11Fd62CC88bd3";
-    this.privateMarkets = new PrivateMarketsModule(this, privateMarketAddr);
-    const readerAddr = options.readerAddress || "0x320C73CD00Dd484b53140795F9eD1C875A5A6D99";
-    this.marketReader = new MarketReaderModule(this, readerAddr);
-    const leverageAddr = options.leverageAddress || "0xD10B597d2B5CDAf965f7AC29339866513311e84d";
-    this.leverageSimulator = new LeverageSimulatorModule(this, leverageAddr);
-    const taxesAddr = options.taxesAddress || "0xb65Ff977fFb0ABa34c28e8b571D29DFb1a3416a4";
-    this.taxes = new TaxesModule(this, taxesAddr);
+    this.staking = new StakingModule(this, options.stakingAddress || DEFAULT_ADDRESSES.staking);
+    this.resolver = new MarketResolverModule(this, options.resolverAddress || DEFAULT_ADDRESSES.resolver);
+    this.privateMarkets = new PrivateMarketsModule(this, options.privateMarketAddress || DEFAULT_ADDRESSES.privateMarket);
+    this.marketReader = new MarketReaderModule(this, options.readerAddress || DEFAULT_ADDRESSES.reader);
+    this.leverageSimulator = new LeverageSimulatorModule(this, options.leverageAddress || DEFAULT_ADDRESSES.leverage);
+    this.taxes = new TaxesModule(this, options.taxesAddress || DEFAULT_ADDRESSES.taxes);
     this.agent = new AgentIdentityModule(this);
   }
   /**
@@ -16495,13 +16508,46 @@ var BasisClient = class _BasisClient {
         );
       }
     }
-    if (options.privateKey && !options.apiKey) {
+    if (options.privateKey) {
       if (!client.walletClient?.account) {
         throw new Error("WalletClient was not initialized despite privateKey being provided.");
       }
       const address = client.walletClient.account.address;
       await client.authenticate(address);
-      await client.ensureApiKey();
+      if (!options.apiKey) {
+        await client.ensureApiKey();
+      }
+    }
+    try {
+      const res = await fetch(`${client.apiDomain}/contracts.json`);
+      if (res.ok) {
+        const remote = await res.json();
+        const mapping = [
+          ["factory", remote.factory, DEFAULT_ADDRESSES.factory],
+          ["swap", remote.swap, DEFAULT_ADDRESSES.swap],
+          ["marketTrading", remote.marketTrading, DEFAULT_ADDRESSES.marketTrading],
+          ["loanHub", remote.loanHub, DEFAULT_ADDRESSES.loanHub],
+          ["vesting", remote.vesting, DEFAULT_ADDRESSES.vesting],
+          ["usdb", remote.usdb, DEFAULT_ADDRESSES.usdb],
+          ["mainToken", remote.mainToken, DEFAULT_ADDRESSES.mainToken],
+          ["staking", remote.staking, DEFAULT_ADDRESSES.staking],
+          ["resolver", remote.resolver, DEFAULT_ADDRESSES.resolver],
+          ["privateMarket", remote.privateMarket, DEFAULT_ADDRESSES.privateMarket],
+          ["reader", remote.reader, DEFAULT_ADDRESSES.reader],
+          ["leverage", remote.leverage, DEFAULT_ADDRESSES.leverage],
+          ["taxes", remote.taxes, DEFAULT_ADDRESSES.taxes]
+        ];
+        const mismatched = mapping.filter(
+          ([, remoteAddr, defaultAddr]) => remoteAddr && remoteAddr.toLowerCase() !== defaultAddr.toLowerCase()
+        );
+        if (mismatched.length > 0) {
+          console.warn(
+            `[basis-sdk] Contract addresses have changed. Please update your SDK to the latest version.
+Mismatched: ${mismatched.map(([name]) => name).join(", ")}`
+          );
+        }
+      }
+    } catch {
     }
     if (options.agent && options.privateKey) {
       const agentConfig = typeof options.agent === "object" ? options.agent : void 0;
@@ -16565,10 +16611,21 @@ var BasisClient = class _BasisClient {
     }
   }
   /**
-   * Ensures an API key exists for the authenticated session.
-   * Fetches existing keys or creates one labeled "basis-sdk-auto".
+   * Ensures an API key is available.
+   *
+   * - If an API key was already provided via the constructor, this is a no-op.
+   * - If the server reports an existing key, the SDK cannot retrieve the
+   *   plaintext (only a masked hint is returned). In that case an error is
+   *   thrown instructing the operator to supply the key.
+   * - If no keys exist yet, a new one is created. The key is only returned
+   *   **once** at creation time — store it securely for future runs.
+   *
+   * @returns The API key string.
    */
   async ensureApiKey() {
+    if (this._apiKey) {
+      return this._apiKey;
+    }
     if (!this._sessionCookie) {
       throw new Error("No session cookie. Call authenticate() first.");
     }
@@ -16579,15 +16636,10 @@ var BasisClient = class _BasisClient {
       throw new Error(`Failed to list API keys: ${listRes.status} ${listRes.statusText}`);
     }
     const listData = await listRes.json();
-    if (listData.keys && listData.keys.length > 0 && listData.keys[0].key) {
-      this._apiKey = listData.keys[0].key;
-      return;
-    }
-    if (listData.keys && listData.keys.length > 0 && !listData.keys[0].key) {
-      await fetch(`${this.apiDomain}/api/v1/auth/keys/${listData.keys[0].id}`, {
-        method: "DELETE",
-        headers: { Cookie: this._sessionCookie }
-      });
+    if (listData.keys && listData.keys.length > 0) {
+      throw new Error(
+        'An API key already exists for this wallet but the full key cannot be retrieved (the server only returns a masked hint). Pass your API key via the apiKey option when creating the client, e.g.: BasisClient.create({ privateKey, apiKey: "bsk_..." })'
+      );
     }
     const createRes = await fetch(`${this.apiDomain}/api/v1/auth/keys`, {
       method: "POST",
@@ -16604,7 +16656,13 @@ var BasisClient = class _BasisClient {
       );
     }
     const createData = await createRes.json();
-    this._apiKey = createData.key;
+    const newKey = createData.key;
+    this._apiKey = newKey;
+    console.warn(
+      `[basis-sdk] New API key created: ${newKey}
+Save this key \u2014 it cannot be retrieved again. Pass it via the apiKey option on future runs.`
+    );
+    return newKey;
   }
   /**
    * Returns the current session status.
@@ -16642,45 +16700,16 @@ var BasisClient = class _BasisClient {
     return data;
   }
   /**
-   * Claims 10,000 test USDB from the faucet. One claim per wallet, ever.
-   * USDB from faucet is non-transferable except to Basis protocol contracts.
-   * Optionally pass a referrer address for the referral system.
+   * Claims daily USDB from the faucet via the server API.
+   * Amount depends on active signals (max 500 USDB/day, 24h cooldown).
+   * Requires SIWE session — call authenticate() first.
+   *
+   * Convenience wrapper around `client.api.claimFaucet()`.
+   *
+   * @param referrer - Optional referrer wallet address for the referral system.
    */
-  async claimFaucet(referrer = "0x0000000000000000000000000000000000000000") {
-    if (!this.walletClient || !this.walletClient.account) {
-      throw new Error("Wallet (privateKey) is required to claim faucet.");
-    }
-    const faucetAbi = [{ inputs: [{ name: "_referrer", type: "address" }], name: "faucet", outputs: [], stateMutability: "nonpayable", type: "function" }];
-    const { request } = await this.publicClient.simulateContract({
-      account: this.walletClient.account,
-      address: this.usdbAddress,
-      abi: faucetAbi,
-      functionName: "faucet",
-      args: [referrer]
-    });
-    const hash = await this.writeContract(request);
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
-    return { hash, receipt };
-  }
-  /**
-   * Sets a referrer for the current wallet. One-time only — reverts if already set.
-   * Use this if you didn't pass a referrer during claimFaucet().
-   */
-  async setReferrer(referrer) {
-    if (!this.walletClient || !this.walletClient.account) {
-      throw new Error("Wallet (privateKey) is required.");
-    }
-    const abi = [{ inputs: [{ name: "_referrer", type: "address" }], name: "setReferrer", outputs: [], stateMutability: "nonpayable", type: "function" }];
-    const { request } = await this.publicClient.simulateContract({
-      account: this.walletClient.account,
-      address: this.usdbAddress,
-      abi,
-      functionName: "setReferrer",
-      args: [referrer]
-    });
-    const hash = await this.writeContract(request);
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
-    return { hash, receipt };
+  async claimFaucet(referrer) {
+    return this.api.claimFaucet(referrer);
   }
 };
 // Annotate the CommonJS export names for ESM import in node:

@@ -121,7 +121,7 @@ export class PredictionMarketsModule {
     bonding?: bigint;
     seedAmount?: bigint;
     description?: string;
-    imageUrl?: string;
+    imageUrl: string;
     website?: string;
     telegram?: string;
     twitterx?: string;
@@ -154,11 +154,8 @@ export class PredictionMarketsModule {
       throw new Error('Could not extract market address from creation logs.');
     }
 
-    // Upload image if provided
-    let imageUrl: string | undefined;
-    if (options.imageUrl) {
-      imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, marketTokenAddress);
-    }
+    // Upload image
+    const imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, marketTokenAddress);
 
     // Create metadata
     const metadata = await this.client.api.updateMetadata({

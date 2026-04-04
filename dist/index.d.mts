@@ -481,24 +481,50 @@ declare class BasisAPI {
         loan?: Record<string, unknown>;
         error?: string;
     }>;
-    /**
-     * POST /api/v1/sync/faucet — sync a faucet claim transaction for referral tracking.
-     * No authentication required. Rate limited to 20 req/min.
-     */
-    syncFaucet(txHash: string): Promise<{
-        success: boolean;
-        events?: {
-            faucetClaimed?: boolean;
-            referrerSet?: boolean;
-        };
-        error?: string;
-    }>;
     /** @deprecated Use syncTransaction() instead */
     syncLoan(txHash: string): Promise<{
         success: boolean;
         events?: unknown[];
         loan?: Record<string, unknown>;
         error?: string;
+    }>;
+    /**
+     * GET /api/v1/faucet/status — check faucet eligibility and signal breakdown.
+     * Requires SIWE session. The wallet is determined from the session.
+     */
+    getFaucetStatus(): Promise<{
+        eligible: boolean;
+        canClaim: boolean;
+        dailyAmount: number;
+        signals: {
+            base: boolean;
+            twitter: boolean;
+            active: boolean;
+            hatchling: boolean;
+            tidal: boolean;
+        };
+        cooldownRemaining: number;
+        nextClaimAt: string | null;
+        hasReferrer: boolean;
+    }>;
+    /**
+     * POST /api/v1/faucet/claim — claim daily USDB from the treasury.
+     * Requires SIWE session. Amount is based on active signals (max 500 USDB/day).
+     * 24-hour cooldown between claims.
+     *
+     * @param referrer - Optional referrer wallet address for the referral system.
+     */
+    claimFaucet(referrer?: string): Promise<{
+        success: boolean;
+        amount: number;
+        txHash: string;
+        signals: {
+            base: boolean;
+            twitter: boolean;
+            active: boolean;
+            hatchling: boolean;
+            tidal: boolean;
+        };
     }>;
     /**
      * Internal helper: fetch with API key or session cookie.
@@ -813,7 +839,7 @@ declare class FactoryModule {
         autoVestDuration?: bigint;
         gradualAutovest?: boolean;
         description?: string;
-        imageUrl?: string;
+        imageUrl: string;
         website?: string;
         telegram?: string;
         twitterx?: string;
@@ -821,7 +847,7 @@ declare class FactoryModule {
         hash: `0x${string}`;
         receipt: viem.TransactionReceipt;
         tokenAddress: `0x${string}`;
-        imageUrl: string | undefined;
+        imageUrl: string;
         metadata: {
             url: string;
             cid: string;
@@ -1005,7 +1031,7 @@ declare class PredictionMarketsModule {
         bonding?: bigint;
         seedAmount?: bigint;
         description?: string;
-        imageUrl?: string;
+        imageUrl: string;
         website?: string;
         telegram?: string;
         twitterx?: string;
@@ -1013,7 +1039,7 @@ declare class PredictionMarketsModule {
         hash: `0x${string}`;
         receipt: viem.TransactionReceipt;
         marketTokenAddress: `0x${string}`;
-        imageUrl: string | undefined;
+        imageUrl: string;
         metadata: {
             url: string;
             cid: string;
@@ -1565,7 +1591,7 @@ declare class PrivateMarketsModule {
         bonding?: bigint;
         seedAmount?: bigint;
         description?: string;
-        imageUrl?: string;
+        imageUrl: string;
         website?: string;
         telegram?: string;
         twitterx?: string;
@@ -1573,7 +1599,7 @@ declare class PrivateMarketsModule {
         hash: `0x${string}`;
         receipt: viem.TransactionReceipt;
         marketTokenAddress: `0x${string}`;
-        imageUrl: string | undefined;
+        imageUrl: string;
         metadata: {
             url: string;
             cid: string;
@@ -2016,10 +2042,18 @@ declare class BasisClient {
      */
     authenticate(address: `0x${string}`): Promise<void>;
     /**
-     * Ensures an API key exists for the authenticated session.
-     * Fetches existing keys or creates one labeled "basis-sdk-auto".
+     * Ensures an API key is available.
+     *
+     * - If an API key was already provided via the constructor, this is a no-op.
+     * - If the server reports an existing key, the SDK cannot retrieve the
+     *   plaintext (only a masked hint is returned). In that case an error is
+     *   thrown instructing the operator to supply the key.
+     * - If no keys exist yet, a new one is created. The key is only returned
+     *   **once** at creation time — store it securely for future runs.
+     *
+     * @returns The API key string.
      */
-    ensureApiKey(): Promise<void>;
+    ensureApiKey(): Promise<string>;
     /**
      * Returns the current session status.
      * Optionally checks for a specific address.
@@ -2038,21 +2072,25 @@ declare class BasisClient {
         message: string;
     }>;
     /**
-     * Claims 10,000 test USDB from the faucet. One claim per wallet, ever.
-     * USDB from faucet is non-transferable except to Basis protocol contracts.
-     * Optionally pass a referrer address for the referral system.
+     * Claims daily USDB from the faucet via the server API.
+     * Amount depends on active signals (max 500 USDB/day, 24h cooldown).
+     * Requires SIWE session — call authenticate() first.
+     *
+     * Convenience wrapper around `client.api.claimFaucet()`.
+     *
+     * @param referrer - Optional referrer wallet address for the referral system.
      */
-    claimFaucet(referrer?: `0x${string}`): Promise<{
-        hash: string;
-        receipt: any;
-    }>;
-    /**
-     * Sets a referrer for the current wallet. One-time only — reverts if already set.
-     * Use this if you didn't pass a referrer during claimFaucet().
-     */
-    setReferrer(referrer: `0x${string}`): Promise<{
-        hash: string;
-        receipt: any;
+    claimFaucet(referrer?: string): Promise<{
+        success: boolean;
+        amount: number;
+        txHash: string;
+        signals: {
+            base: boolean;
+            twitter: boolean;
+            active: boolean;
+            hatchling: boolean;
+            tidal: boolean;
+        };
     }>;
 }
 

@@ -878,29 +878,67 @@ export class BasisAPI {
     return res.json();
   }
 
-  /**
-   * POST /api/v1/sync/faucet — sync a faucet claim transaction for referral tracking.
-   * No authentication required. Rate limited to 20 req/min.
-   */
-  async syncFaucet(
-    txHash: string,
-  ): Promise<{ success: boolean; events?: { faucetClaimed?: boolean; referrerSet?: boolean }; error?: string }> {
-    const url = `${this.client.apiDomain}/api/v1/sync/faucet`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ txHash }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`Faucet sync failed [${res.status}]: ${body}`);
-    }
-    return res.json();
-  }
-
   /** @deprecated Use syncTransaction() instead */
   async syncLoan(txHash: string) {
     return this.syncTransaction(txHash);
+  }
+
+  // -----------------------------------------------------------------------
+  // Faucet (session required)
+  // -----------------------------------------------------------------------
+
+  /**
+   * GET /api/v1/faucet/status — check faucet eligibility and signal breakdown.
+   * Requires SIWE session. The wallet is determined from the session.
+   */
+  async getFaucetStatus(): Promise<{
+    eligible: boolean;
+    canClaim: boolean;
+    dailyAmount: number;
+    signals: {
+      base: boolean;
+      twitter: boolean;
+      active: boolean;
+      hatchling: boolean;
+      tidal: boolean;
+    };
+    cooldownRemaining: number;
+    nextClaimAt: string | null;
+    hasReferrer: boolean;
+  }> {
+    const res = await this.fetchWithSession('/api/v1/faucet/status');
+    return res.json();
+  }
+
+  /**
+   * POST /api/v1/faucet/claim — claim daily USDB from the treasury.
+   * Requires SIWE session. Amount is based on active signals (max 500 USDB/day).
+   * 24-hour cooldown between claims.
+   *
+   * @param referrer - Optional referrer wallet address for the referral system.
+   */
+  async claimFaucet(referrer?: string): Promise<{
+    success: boolean;
+    amount: number;
+    txHash: string;
+    signals: {
+      base: boolean;
+      twitter: boolean;
+      active: boolean;
+      hatchling: boolean;
+      tidal: boolean;
+    };
+  }> {
+    const body: Record<string, string> = {};
+    if (referrer) {
+      body.referrer = referrer;
+    }
+    const res = await this.fetchWithSession('/api/v1/faucet/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.json();
   }
 
   // -----------------------------------------------------------------------

@@ -95,7 +95,7 @@ export class FactoryModule {
     autoVestDuration?: bigint;
     gradualAutovest?: boolean;
     description?: string;
-    imageUrl?: string;
+    imageUrl: string;
     website?: string;
     telegram?: string;
     twitterx?: string;
@@ -130,11 +130,8 @@ export class FactoryModule {
       throw new Error('Could not extract token address from creation logs.');
     }
 
-    // 3. Upload image if provided
-    let imageUrl: string | undefined;
-    if (options.imageUrl) {
-      imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, tokenAddress);
-    }
+    // 3. Upload image
+    const imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, tokenAddress);
 
     // 4. Create metadata on IPFS
     const metadata = await this.client.api.updateMetadata({
