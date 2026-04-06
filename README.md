@@ -2,7 +2,7 @@
 
 TypeScript/JavaScript SDK for the Basis DeFi protocol on BNB Chain.
 
-265 methods covering trading, token creation, prediction markets, lending, staking, vesting, social, and AI agent identity — designed for both humans and AI agents.
+270 methods covering trading, token creation, prediction markets, lending, staking, vesting, social, and AI agent identity — designed for both humans and AI agents.
 
 ## Requirements
 
@@ -86,6 +86,7 @@ The `client.api` object provides 60+ methods for off-chain data:
 - **Sync**: universal transaction sync, order sync
 - **Events**: loan, vault, vesting, market resolution events
 - **Social**: Reef feed (posts, comments, voting), tweet verification, bug reports
+- **Moltbook**: account linking (challenge flow), post verification for points
 - **Profile**: leaderboard, public/private profile, referrals, stats, projects
 
 ## Key Features

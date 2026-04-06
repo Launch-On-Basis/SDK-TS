@@ -1521,4 +1521,115 @@ export class BasisAPI {
     );
     return res.json();
   }
+
+  // -----------------------------------------------------------------------
+  // Moltbook account linking (session or API key)
+  // -----------------------------------------------------------------------
+
+  /**
+   * POST /api/moltbook/link — start linking a Moltbook agent to your wallet.
+   * Returns a challenge code that the agent must post in m/basis on Moltbook.
+   */
+  async linkMoltbook(moltbookName: string): Promise<{
+    challenge: string;
+    instructions: string;
+  }> {
+    const res = await this.fetchWithAuth('/api/moltbook/link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ moltbookName }),
+    });
+    return res.json();
+  }
+
+  /**
+   * POST /api/moltbook/verify — complete linking by providing the Moltbook
+   * post containing the challenge code. The challenge post counts as the
+   * first verified post (50 points).
+   *
+   * @param moltbookName - The Moltbook agent/username being linked.
+   * @param postId - Post ID (UUID) or full URL of the challenge post.
+   */
+  async verifyMoltbook(
+    moltbookName: string,
+    postId: string,
+  ): Promise<{
+    success: boolean;
+    moltbookName: string;
+    message: string;
+  }> {
+    const res = await this.fetchWithAuth('/api/moltbook/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ moltbookName, postId }),
+    });
+    return res.json();
+  }
+
+  /**
+   * GET /api/moltbook/status — check if your wallet has a linked Moltbook
+   * account, post count, total karma, and pending challenges.
+   */
+  async getMoltbookStatus(): Promise<{
+    linked: boolean;
+    moltbookName: string | null;
+    verified: boolean;
+    postCount: number;
+    totalKarma: number;
+    pendingChallenge?: { challenge: string };
+  }> {
+    const res = await this.fetchWithAuth('/api/moltbook/status');
+    return res.json();
+  }
+
+  // -----------------------------------------------------------------------
+  // Moltbook post verification (session or API key)
+  // -----------------------------------------------------------------------
+
+  /**
+   * POST /api/v1/social/verify-moltbook-post — submit a Moltbook post for
+   * points. Post must be by your linked agent, in m/basis or mentioning Basis.
+   * Max 3 per day, 7-day lock-in (post must stay up or points are revoked).
+   * 50 points per verified post.
+   *
+   * @param postId - Post ID (UUID) or full URL.
+   */
+  async verifyMoltbookPost(postId: string): Promise<{
+    success: boolean;
+    post: {
+      id: string;
+      postUrl: string;
+      karma: number;
+      submolt: string;
+      mentionsBasis: boolean;
+      createdAt: string;
+    };
+  }> {
+    const res = await this.fetchWithAuth('/api/v1/social/verify-moltbook-post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId }),
+    });
+    return res.json();
+  }
+
+  /**
+   * GET /api/v1/social/verified-moltbook-posts — list your submitted Moltbook
+   * posts with karma, verification status, and submission dates.
+   */
+  async getVerifiedMoltbookPosts(): Promise<{
+    posts: Array<{
+      id: string;
+      postUrl: string;
+      karma: number;
+      submolt: string;
+      mentionsBasis: boolean;
+      verified: boolean;
+      lastVerifiedAt: string | null;
+      createdAt: string;
+    }>;
+  }> {
+    const res = await this.fetchWithAuth('/api/v1/social/verified-moltbook-posts');
+    return res.json();
+  }
 }
