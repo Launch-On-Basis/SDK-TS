@@ -13,11 +13,7 @@ export class MarketResolverModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   private async approveIfNeeded(tokenAddress: Address, spender: Address, amount: bigint) {
@@ -52,6 +48,8 @@ export class MarketResolverModule {
   /**
    * Proposes an outcome for a market.
    * Auto-approves USDB to the resolver for the PROPOSAL_BOND amount.
+   * @param marketToken - prediction market token address
+   * @param outcomeId - outcome index
    */
   async proposeOutcome(marketToken: Address, outcomeId: number) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -76,13 +74,15 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Disputes a proposed outcome.
    * Auto-approves USDB to the resolver for the PROPOSAL_BOND amount.
+   * @param marketToken - prediction market token address
+   * @param newOutcomeId - proposed alternative outcome index
    */
   async dispute(marketToken: Address, newOutcomeId: number) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -107,12 +107,14 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Casts a vote on a disputed market outcome.
+   * @param marketToken - prediction market token address
+   * @param outcomeId - outcome index to vote for
    */
   async vote(marketToken: Address, outcomeId: number) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -130,13 +132,14 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Stakes tokens to become a resolver voter.
    * Auto-approves the token to the resolver for MIN_STAKE_AMOUNT.
+   * @param token - token contract address to stake
    */
   async stake(token: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -161,12 +164,13 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Unstakes tokens, removing resolver voter status.
+   * @param token - token contract address to unstake
    */
   async unstake(token: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -184,12 +188,13 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Finalizes an uncontested market (proposal period expired without dispute).
+   * @param marketToken - prediction market token address
    */
   async finalizeUncontested(marketToken: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -207,12 +212,13 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Finalizes a disputed market after the dispute period.
+   * @param marketToken - prediction market token address
    */
   async finalizeMarket(marketToken: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -230,13 +236,15 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Vetoes a proposed outcome.
    * Auto-approves USDB to the resolver for the PROPOSAL_BOND amount.
+   * @param marketToken - prediction market token address
+   * @param proposedOutcome - outcome index being vetoed
    */
   async veto(marketToken: Address, proposedOutcome: number) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -261,12 +269,13 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Claims the bounty reward for voting correctly on a resolved market.
+   * @param marketToken - prediction market token address
    */
   async claimBounty(marketToken: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -284,12 +293,14 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Claims an early bounty reward for a specific dispute round.
+   * @param marketToken - prediction market token address
+   * @param round - dispute round number (integer)
    */
   async claimEarlyBounty(marketToken: Address, round: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -307,7 +318,7 @@ export class MarketResolverModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -317,6 +328,7 @@ export class MarketResolverModule {
 
   /**
    * Returns the dispute data struct for a market.
+   * @param marketToken - prediction market token address
    */
   async getDisputeData(marketToken: Address) {
     return this.client.publicClient.readContract({
@@ -329,6 +341,7 @@ export class MarketResolverModule {
 
   /**
    * Returns whether a market has been resolved.
+   * @param marketToken - prediction market token address
    */
   async isResolved(marketToken: Address): Promise<boolean> {
     return this.client.publicClient.readContract({
@@ -341,6 +354,7 @@ export class MarketResolverModule {
 
   /**
    * Returns the final outcome of a resolved market.
+   * @param marketToken - prediction market token address
    */
   async getFinalOutcome(marketToken: Address): Promise<number> {
     return this.client.publicClient.readContract({
@@ -353,6 +367,7 @@ export class MarketResolverModule {
 
   /**
    * Returns whether a market is currently in a dispute.
+   * @param marketToken - prediction market token address
    */
   async isInDispute(marketToken: Address): Promise<boolean> {
     return this.client.publicClient.readContract({
@@ -365,6 +380,7 @@ export class MarketResolverModule {
 
   /**
    * Returns whether a market is currently in a veto period.
+   * @param marketToken - prediction market token address
    */
   async isInVeto(marketToken: Address): Promise<boolean> {
     return this.client.publicClient.readContract({
@@ -377,6 +393,7 @@ export class MarketResolverModule {
 
   /**
    * Returns the current dispute round for a market.
+   * @param marketToken - prediction market token address
    */
   async getCurrentRound(marketToken: Address): Promise<bigint> {
     return this.client.publicClient.readContract({
@@ -389,6 +406,9 @@ export class MarketResolverModule {
 
   /**
    * Returns the vote count for a specific outcome in a specific round.
+   * @param marketToken - prediction market token address
+   * @param round - dispute round number (integer)
+   * @param outcomeId - outcome index
    */
   async getVoteCount(marketToken: Address, round: bigint, outcomeId: number): Promise<bigint> {
     return this.client.publicClient.readContract({
@@ -401,6 +421,9 @@ export class MarketResolverModule {
 
   /**
    * Returns whether a voter has already voted in a specific round.
+   * @param marketToken - prediction market token address
+   * @param round - dispute round number (integer)
+   * @param voter - voter wallet address
    */
   async hasVoted(marketToken: Address, round: bigint, voter: Address): Promise<boolean> {
     return this.client.publicClient.readContract({
@@ -413,6 +436,9 @@ export class MarketResolverModule {
 
   /**
    * Returns the outcome a voter chose in a specific round.
+   * @param marketToken - prediction market token address
+   * @param round - dispute round number (integer)
+   * @param voter - voter wallet address
    */
   async getVoterChoice(marketToken: Address, round: bigint, voter: Address): Promise<number> {
     return this.client.publicClient.readContract({
@@ -425,6 +451,7 @@ export class MarketResolverModule {
 
   /**
    * Returns the bounty amount per correct vote for a resolved market.
+   * @param marketToken - prediction market token address
    */
   async getBountyPerVote(marketToken: Address): Promise<bigint> {
     return this.client.publicClient.readContract({
@@ -437,6 +464,8 @@ export class MarketResolverModule {
 
   /**
    * Returns whether a voter has already claimed the bounty for a market.
+   * @param marketToken - prediction market token address
+   * @param voter - voter wallet address
    */
   async hasClaimed(marketToken: Address, voter: Address): Promise<boolean> {
     return this.client.publicClient.readContract({
@@ -449,6 +478,7 @@ export class MarketResolverModule {
 
   /**
    * Returns the staked amount for a voter.
+   * @param voter - voter wallet address
    */
   async getUserStake(voter: Address): Promise<bigint> {
     return this.client.publicClient.readContract({
@@ -461,6 +491,7 @@ export class MarketResolverModule {
 
   /**
    * Returns whether an address is a registered voter.
+   * @param voter - voter wallet address
    */
   async isVoter(voter: Address): Promise<boolean> {
     return this.client.publicClient.readContract({

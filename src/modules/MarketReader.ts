@@ -26,6 +26,7 @@ export class MarketReaderModule {
   /**
    * Estimates the number of shares received for a given USDB input,
    * considering both order book fills and AMM.
+   * @param usdbAmount - USDB amount in wei (18 decimals)
    */
   async estimateSharesOut(
     routerAddress: Address,
@@ -45,6 +46,8 @@ export class MarketReaderModule {
 
   /**
    * Returns potential payout for holding or selling shares.
+   * @param sharesAmount - shares in wei (18 decimals)
+   * @param estimatedUsdbToPool - USDB amount in wei (18 decimals)
    */
   async getPotentialPayout(
     routerAddress: Address,

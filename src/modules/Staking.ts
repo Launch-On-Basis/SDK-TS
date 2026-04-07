@@ -13,11 +13,7 @@ export class StakingModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   private async approveIfNeeded(tokenAddress: Address, spender: Address, amount: bigint) {
@@ -48,6 +44,7 @@ export class StakingModule {
   /**
    * Wraps STASIS (MAINTOKEN) into wSTASIS.
    * Approves the staking contract to spend MAINTOKEN if needed.
+   * @param amount - STASIS amount in wei (18 decimals)
    */
   async buy(amount: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -68,12 +65,15 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Unwraps wSTASIS back to STASIS, optionally converting to USDB.
+   * @param shares - wSTASIS shares in wei (18 decimals)
+   * @param claimUSDB - whether to convert to USDB
+   * @param minUSDB - minimum USDB output in wei (18 decimals)
    */
   async sell(shares: bigint, claimUSDB: boolean = false, minUSDB: bigint = 0n) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -91,12 +91,13 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Locks wSTASIS as collateral for borrowing.
+   * @param shares - wSTASIS shares in wei (18 decimals)
    */
   async lock(shares: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -117,12 +118,13 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Unlocks wSTASIS collateral.
+   * @param shares - wSTASIS shares in wei (18 decimals)
    */
   async unlock(shares: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -140,13 +142,15 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Pledges STASIS as collateral and borrows USDB against it.
    * The stasisAmountToBorrow parameter is the STASIS amount to pledge — USDB received is collateral value minus fees.
+   * @param stasisAmountToBorrow - STASIS collateral amount in wei (18 decimals)
+   * @param days - integer, minimum 10
    */
   async borrow(stasisAmountToBorrow: bigint, days: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -164,7 +168,7 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -197,12 +201,15 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Extends the active staking loan.
+   * @param daysToAdd - integer, minimum 10
+   * @param payInUSDB - whether to pay extension fee in USDB
+   * @param refinance - whether to refinance the loan
    */
   async extendLoan(daysToAdd: bigint, payInUSDB: boolean, refinance: boolean) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -233,7 +240,7 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -264,6 +271,7 @@ export class StakingModule {
 
   /**
    * Converts STASIS amount to wSTASIS shares.
+   * @param assets - STASIS amount in wei (18 decimals)
    */
   async convertToShares(assets: bigint) {
     return this.client.publicClient.readContract({
@@ -276,6 +284,7 @@ export class StakingModule {
 
   /**
    * Converts wSTASIS shares to STASIS amount.
+   * @param shares - wSTASIS shares in wei (18 decimals)
    */
   async convertToAssets(shares: bigint) {
     return this.client.publicClient.readContract({
@@ -299,6 +308,7 @@ export class StakingModule {
 
   /**
    * Borrows additional STASIS against locked wSTASIS collateral on an existing loan.
+   * @param additionalStasisToBorrow - STASIS collateral amount in wei (18 decimals)
    */
   async addToLoan(additionalStasisToBorrow: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -316,7 +326,7 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -338,7 +348,7 @@ export class StakingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 }

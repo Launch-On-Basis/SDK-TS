@@ -20,11 +20,7 @@ export class TradingModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   /**
@@ -63,6 +59,10 @@ export class TradingModule {
   /**
    * Buys tokens during the bonding curve phase.
    * Calls buyTokens on SWAP.sol.
+   * @param amount — input token amount in wei (18 decimals)
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param path — ordered list of token addresses for the swap route
+   * @param wrapTokens — whether to wrap output tokens
    */
   async buyBondingTokens(amount: bigint, minOut: bigint, path: Address[], wrapTokens: boolean) {
     return this.buyTokens(amount, minOut, path, wrapTokens);
@@ -71,6 +71,10 @@ export class TradingModule {
   /**
    * Sells tokens during the bonding curve phase.
    * Calls sellTokens on SWAP.sol.
+   * @param amount — token amount to sell in wei (18 decimals)
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param path — ordered list of token addresses for the swap route
+   * @param swapToETH — whether to unwrap output to native ETH
    */
   async sellBondingTokens(amount: bigint, minOut: bigint, path: Address[], swapToETH: boolean) {
     return this.sellTokens(amount, minOut, path, swapToETH);
@@ -78,6 +82,10 @@ export class TradingModule {
 
   /**
    * General buy tokens function.
+   * @param amount — input token amount in wei (18 decimals)
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param path — ordered list of token addresses for the swap route
+   * @param wrapTokens — whether to wrap output tokens
    */
   async buyTokens(amount: bigint, minOut: bigint, path: Address[], wrapTokens: boolean) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -102,12 +110,16 @@ export class TradingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * General sell tokens function.
+   * @param amount — token amount to sell in wei (18 decimals)
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param path — ordered list of token addresses for the swap route
+   * @param swapToETH — whether to unwrap output to native ETH
    */
   async sellTokens(amount: bigint, minOut: bigint, path: Address[], swapToETH: boolean) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -132,13 +144,17 @@ export class TradingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Simplified buy: purchases the target token using USDB.
    * Automatically builds the correct swap path.
+   * @param tokenAddress — address of the token to buy
+   * @param usdbAmount — USDB amount in wei (18 decimals)
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param wrapTokens — whether to wrap output tokens
    */
   async buy(tokenAddress: Address, usdbAmount: bigint, minOut: bigint = 0n, wrapTokens: boolean = false) {
     const path = this.buildBuyPath(tokenAddress);
@@ -149,6 +165,11 @@ export class TradingModule {
    * Simplified sell: sells a token.
    * For factory tokens, set toUsdb=true to swap all the way to USDB (3-hop),
    * or false to stop at MAINTOKEN (2-hop). Ignored when selling MAINTOKEN.
+   * @param tokenAddress — address of the token to sell
+   * @param amount — token amount to sell in wei (18 decimals)
+   * @param toUsdb — whether to swap all the way to USDB
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param swapToETH — whether to unwrap output to native ETH
    */
   async sell(tokenAddress: Address, amount: bigint, toUsdb: boolean = false, minOut: bigint = 0n, swapToETH: boolean = false) {
     const path = this.buildSellPath(tokenAddress, toUsdb);
@@ -182,6 +203,10 @@ export class TradingModule {
 
   /**
    * Leveraged buy: purchases tokens with leverage (creates a loan position).
+   * @param amount — USDB collateral amount in wei (18 decimals)
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param path — ordered list of token addresses for the swap route
+   * @param numberOfDays — loan duration in days, integer, minimum 10
    */
   async leverageBuy(amount: bigint, minOut: bigint, path: Address[], numberOfDays: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -206,13 +231,17 @@ export class TradingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Partially sells collateral from a loan/leverage position.
    * percentage must be divisible by 10 (10-100).
+   * @param loanId — ID of the loan/leverage position
+   * @param percentage — integer 10-100, divisible by 10
+   * @param isLeverage — true if leverage position, false if loan
+   * @param minOut — minimum output amount in wei (18 decimals)
    */
   async partialLoanSell(loanId: bigint, percentage: bigint, isLeverage: boolean, minOut: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -230,13 +259,17 @@ export class TradingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Sells a percentage of the user's token balance.
-   * percentage: 1-100
+   * @param tokenAddress — address of the token to sell
+   * @param percentage — integer 1-100
+   * @param toUsdb — whether to swap all the way to USDB
+   * @param minOut — minimum output amount in wei (18 decimals)
+   * @param swapToETH — whether to unwrap output to native ETH
    */
   async sellPercentage(tokenAddress: Address, percentage: number, toUsdb: boolean = false, minOut: bigint = 0n, swapToETH: boolean = false) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -317,6 +350,8 @@ export class TradingModule {
 
   /**
    * Returns the expected output amounts for a given input amount and swap path.
+   * @param amount — input token amount in wei (18 decimals)
+   * @param path — ordered list of token addresses for the swap route
    */
   async getAmountsOut(amount: bigint, path: Address[]): Promise<bigint> {
     return this.client.publicClient.readContract({

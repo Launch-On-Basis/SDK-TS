@@ -206,6 +206,7 @@ export interface UpdateProfilePayload {
   social?: { platform: string; handle: string };
   removeSocial?: string;
   toggleSocialPublic?: string;
+  avatar?: string | null;
 }
 
 export interface UpdateProfileResult {
@@ -381,10 +382,15 @@ export class BasisAPI {
    * POST /api/images — upload an image file.
    *
    * Accepts Blob, Buffer, or a File-like object. Returns the hosted URL string.
+   *
+   * @param purpose - "token" (requires address) or "avatar"
+   * @param address - token/market contract address (required when purpose is "token")
    */
   async uploadImage(
     file: Blob | Buffer,
     filename: string = 'image.png',
+    purpose: 'token' | 'avatar' = 'token',
+    address?: string,
   ): Promise<string> {
     const formData = new FormData();
 
@@ -402,6 +408,12 @@ export class BasisAPI {
       formData.append('file', file, filename);
     }
 
+    formData.append('purpose', purpose);
+    if (purpose === 'token') {
+      if (!address) throw new Error('address is required when purpose is "token"');
+      formData.append('address', address);
+    }
+
     // Do NOT set Content-Type header — fetch/FormData sets the correct
     // multipart boundary automatically.
     const res = await this.fetchWithSession('/api/images', {
@@ -409,13 +421,8 @@ export class BasisAPI {
       body: formData,
     });
 
-    // Response is a URL string
-    const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
-    }
+    const json = await res.json();
+    return json.url;
   }
 
   /**
@@ -424,7 +431,11 @@ export class BasisAPI {
    *
    * Returns the hosted IPFS URL string.
    */
-  async uploadImageFromUrl(imageUrl: string, contractAddress?: string): Promise<string> {
+  async uploadImageFromUrl(
+    imageUrl: string,
+    contractAddress?: string,
+    purpose: 'token' | 'avatar' = 'token',
+  ): Promise<string> {
     // 1. Download the image
     const response = await fetch(imageUrl);
     if (!response.ok) {
@@ -441,7 +452,7 @@ export class BasisAPI {
 
     // 3. Upload — name file after contract address if provided
     const filename = contractAddress ? `${contractAddress}.webp` : `image_${Date.now()}.webp`;
-    return this.uploadImage(webpBuffer, filename);
+    return this.uploadImage(webpBuffer, filename, purpose, contractAddress);
   }
 
   // -----------------------------------------------------------------------
@@ -567,6 +578,7 @@ export class BasisAPI {
   async getTokens(options: {
     search?: string;
     isPrediction?: boolean;
+    dev?: string;
     sort?: string;
     page?: number;
     limit?: number;
@@ -574,6 +586,7 @@ export class BasisAPI {
     const params = new URLSearchParams();
     if (options.search !== undefined) params.set('search', options.search);
     if (options.isPrediction !== undefined) params.set('isPrediction', String(options.isPrediction));
+    if (options.dev !== undefined) params.set('dev', options.dev);
     if (options.sort !== undefined) params.set('sort', options.sort);
     if (options.page !== undefined) params.set('page', String(options.page));
     if (options.limit !== undefined) params.set('limit', String(options.limit));
@@ -1279,6 +1292,8 @@ export class BasisAPI {
    * - `{ social: { platform, handle } }` — link a social account
    * - `{ removeSocial: platform }` — unlink a social account
    * - `{ toggleSocialPublic: platform }` — flip public/private on a social
+   * - `{ avatar: url }` — set avatar (must be HTTPS URL)
+   * - `{ avatar: null }` — clear avatar
    */
   async updateMyProfile(payload: UpdateProfilePayload): Promise<UpdateProfileResult> {
     const res = await this.fetchWithAuth('/api/v1/me/profile', {
@@ -1287,6 +1302,25 @@ export class BasisAPI {
       body: JSON.stringify(payload),
     });
     return res.json();
+  }
+
+  /**
+   * Upload an avatar image and set it on the profile in one call.
+   * Accepts a raw file (Blob/Buffer) or an image URL to download and resize.
+   * Returns the hosted avatar URL.
+   */
+  async setAvatar(
+    source: string | Blob | Buffer,
+    filename: string = 'avatar.webp',
+  ): Promise<string> {
+    let url: string;
+    if (typeof source === 'string') {
+      url = await this.uploadImageFromUrl(source, undefined, 'avatar');
+    } else {
+      url = await this.uploadImage(source, filename, 'avatar');
+    }
+    await this.updateMyProfile({ avatar: url });
+    return url;
   }
 
   /**

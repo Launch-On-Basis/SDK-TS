@@ -13,11 +13,7 @@ export class LoansModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   private async approveIfNeeded(tokenAddress: Address, spender: Address, amount: bigint) {
@@ -47,6 +43,10 @@ export class LoansModule {
 
   /**
    * Takes a loan. Auto-approves the collateral token to the LoanHub.
+   * @param ecosystem - ecosystem contract address
+   * @param collateral - collateral token address
+   * @param amount - collateral amount in wei (18 decimals)
+   * @param daysCount - integer, minimum 10
    */
   async takeLoan(ecosystem: Address, collateral: Address, amount: bigint, daysCount: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -67,7 +67,7 @@ export class LoansModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -100,13 +100,17 @@ export class LoansModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Prolongs duration of a loan.
    * When payInStable is true, auto-approves USDB to the LoanHub.
+   * @param hubId - loan hub identifier
+   * @param addDays - integer, minimum 10
+   * @param payInStable - whether to pay extension fee in USDB
+   * @param refinance - whether to refinance the loan
    */
   async extendLoan(hubId: bigint, addDays: bigint, payInStable: boolean, refinance: boolean) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -137,7 +141,7 @@ export class LoansModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -160,7 +164,7 @@ export class LoansModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -179,6 +183,8 @@ export class LoansModule {
   /**
    * Increases collateral on an existing loan.
    * Reads loan details to find the collateral token, then auto-approves it.
+   * @param hubId - loan hub identifier
+   * @param amountToAdd - additional collateral in wei (18 decimals)
    */
   async increaseLoan(hubId: bigint, amountToAdd: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -203,7 +209,7 @@ export class LoansModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -212,6 +218,10 @@ export class LoansModule {
    */
   /**
    * Partially sell collateral from a hub loan position.
+   * @param hubId - loan hub identifier
+   * @param percentage - integer 10-100, divisible by 10
+   * @param isLeverage - whether this is a leverage position
+   * @param minOut - minimum output in wei (18 decimals)
    */
   async hubPartialLoanSell(hubId: bigint, percentage: bigint, isLeverage: boolean, minOut: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -228,7 +238,7 @@ export class LoansModule {
 
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 

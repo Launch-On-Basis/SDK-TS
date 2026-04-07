@@ -14,11 +14,7 @@ export class PredictionMarketsModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   /**
@@ -101,7 +97,7 @@ export class PredictionMarketsModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -110,6 +106,9 @@ export class PredictionMarketsModule {
    * Requires SIWE authentication.
    *
    * Returns { hash, receipt, marketTokenAddress, imageUrl, metadata }
+   * @param options.endTime - Unix timestamp in seconds
+   * @param options.bonding - USDB amount in wei (18 decimals)
+   * @param options.seedAmount - USDB amount in wei (18 decimals)
    */
   async createMarketWithMetadata(options: {
     marketName: string;
@@ -168,7 +167,7 @@ export class PredictionMarketsModule {
     });
 
     // Sync the creation tx
-    this._syncTx(createResult.hash);
+    await this._syncTx(createResult.hash);
 
     return {
       hash: createResult.hash,
@@ -181,6 +180,12 @@ export class PredictionMarketsModule {
 
   /**
    * Executes an AMM buy for a prediction outcome.
+   * @param marketToken - market token address
+   * @param outcomeId - outcome index
+   * @param inputToken - input token address
+   * @param inputAmount - input token amount in wei (18 decimals)
+   * @param minUsdb - minimum USDB in wei (18 decimals)
+   * @param minShares - minimum shares in wei (18 decimals)
    */
   async buy(
     marketToken: Address,
@@ -207,7 +212,7 @@ export class PredictionMarketsModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -230,7 +235,7 @@ export class PredictionMarketsModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -330,6 +335,9 @@ export class PredictionMarketsModule {
     }) as Promise<bigint>;
   }
 
+  /**
+   * @param usdbAmount - USDB amount in wei (18 decimals)
+   */
   async getBuyOrderAmountsOut(marketToken: Address, orderId: bigint, usdbAmount: bigint) {
     return this.client.publicClient.readContract({
       address: this.marketTradingAddress,
@@ -339,6 +347,11 @@ export class PredictionMarketsModule {
     });
   }
 
+  /**
+   * Buys from order book and AMM in a single transaction.
+   * @param totalInput - input token amount in wei (18 decimals)
+   * @param minShares - minimum shares in wei (18 decimals)
+   */
   async buyOrdersAndContract(
     marketToken: Address,
     outcomeId: number,
@@ -364,9 +377,9 @@ export class PredictionMarketsModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
     // Also sync order fills since this method fills P2P orders
-    try { await this.client.api.syncOrder(hash, 'public'); } catch {}
+    await this.client.api.syncOrder(hash, 'public');
     return { hash, receipt };
   }
 }

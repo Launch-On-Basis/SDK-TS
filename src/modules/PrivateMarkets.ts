@@ -39,19 +39,11 @@ export class PrivateMarketsModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   private async syncOrder(txHash: string): Promise<void> {
-    try {
-      await this.client.api.syncOrder(txHash, 'private');
-    } catch (err) {
-      console.warn('Order sync warning:', err instanceof Error ? err.message : err);
-    }
+    await this.client.api.syncOrder(txHash, 'private');
   }
 
   // -----------------------------------------------------------------------
@@ -117,6 +109,9 @@ export class PrivateMarketsModule {
    * Requires SIWE authentication.
    *
    * Returns { hash, receipt, marketTokenAddress, imageUrl, metadata }
+   * @param options.endTime - Unix timestamp in seconds
+   * @param options.bonding - USDB amount in wei (18 decimals)
+   * @param options.seedAmount - USDB amount in wei (18 decimals)
    */
   async createMarketWithMetadata(options: {
     marketName: string;
@@ -176,6 +171,9 @@ export class PrivateMarketsModule {
       twitterx: options.twitterx,
     });
 
+    // Sync the creation tx
+    await this._syncTx(createResult.hash);
+
     return {
       hash: createResult.hash,
       receipt: createResult.receipt,
@@ -188,6 +186,9 @@ export class PrivateMarketsModule {
   /**
    * Executes an AMM buy for a private market outcome.
    * Auto-approves the input token.
+   * @param inputAmount - input token amount in wei (18 decimals)
+   * @param minUsdb - minimum USDB in wei (18 decimals)
+   * @param minShares - minimum shares in wei (18 decimals)
    */
   async buy(
     marketToken: Address,
@@ -245,6 +246,8 @@ export class PrivateMarketsModule {
 
   /**
    * Creates a limit order on a private market.
+   * @param amount - shares in wei (18 decimals)
+   * @param pricePerShare - USDB per share in wei (18 decimals)
    */
   async listOrder(marketToken: Address, outcomeId: number, amount: bigint, pricePerShare: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -294,6 +297,7 @@ export class PrivateMarketsModule {
   /**
    * Fills a specific order on a private market.
    * Auto-approves USDB for the order cost.
+   * @param fill - shares to fill in wei (18 decimals)
    */
   async buyOrder(marketToken: Address, orderId: bigint, fill: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -323,6 +327,7 @@ export class PrivateMarketsModule {
 
   /**
    * Sweeps multiple orders on a private market.
+   * @param usdbAmount - USDB amount in wei (18 decimals)
    */
   async buyMultipleOrders(marketToken: Address, orderIds: bigint[], usdbAmount: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -351,6 +356,8 @@ export class PrivateMarketsModule {
   /**
    * Buys from order book and AMM in a single transaction.
    * Auto-approves the input token.
+   * @param totalInput - input token amount in wei (18 decimals)
+   * @param minShares - minimum shares in wei (18 decimals)
    */
   async buyOrdersAndContract(
     marketToken: Address,
@@ -378,7 +385,7 @@ export class PrivateMarketsModule {
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
     await this.syncOrder(hash);
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -529,6 +536,7 @@ export class PrivateMarketsModule {
 
   /**
    * Manages the whitelist for a private market.
+   * @param amount - token amount in wei (18 decimals)
    */
   async manageWhitelist(marketToken: Address, wallets: Address[], amount: bigint, tag: string, status: boolean) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -629,6 +637,7 @@ export class PrivateMarketsModule {
 
   /**
    * Returns the cost to buy an order.
+   * @param fill - shares to fill in wei (18 decimals)
    */
   async getBuyOrderCost(marketToken: Address, orderId: bigint, fill: bigint) {
     return this.client.publicClient.readContract({
@@ -641,6 +650,7 @@ export class PrivateMarketsModule {
 
   /**
    * Returns the amounts out when buying an order with a specific USDB amount.
+   * @param usdbAmount - USDB amount in wei (18 decimals)
    */
   async getBuyOrderAmountsOut(marketToken: Address, orderId: bigint, usdbAmount: bigint) {
     return this.client.publicClient.readContract({

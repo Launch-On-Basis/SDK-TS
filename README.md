@@ -91,6 +91,7 @@ The `client.api` object provides 60+ methods for off-chain data:
 
 ## Key Features
 
+- **Gasless transactions** — all writes go through MegaFuel (0 gas), with automatic fallback to regular RPC when limits are hit
 - **Auto-approval** — token allowances are handled automatically before every transaction
 - **Auto-sync** — every write method syncs to the backend database via `POST /api/v1/sync`
 - **SIWE authentication** — `BasisClient.create()` handles the full wallet sign-in flow

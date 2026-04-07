@@ -36,6 +36,8 @@ export class OrderBookModule {
 
   /**
    * Creates a limit order.
+   * @param amount - shares in wei (18 decimals)
+   * @param pricePerShare - USDB per share in wei (18 decimals)
    */
   async listOrder(marketToken: Address, outcomeId: number, amount: bigint, pricePerShare: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -85,6 +87,7 @@ export class OrderBookModule {
 
   /**
    * Executes against a specific order.
+   * @param fill - shares to fill in wei (18 decimals)
    */
   async buyOrder(marketToken: Address, orderId: bigint, fill: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -114,6 +117,7 @@ export class OrderBookModule {
 
   /**
    * Sweeps multiple orders.
+   * @param usdbAmount - USDB amount in wei (18 decimals)
    */
   async buyMultipleOrders(marketToken: Address, orderIds: bigint[], usdbAmount: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -144,16 +148,12 @@ export class OrderBookModule {
    * Called automatically after listOrder, cancelOrder, buyOrder, buyMultipleOrders.
    */
   private async syncOrder(txHash: string, marketType: string = 'public'): Promise<void> {
-    try {
-      await this.client.api.syncOrder(txHash, marketType);
-    } catch (err) {
-      // Non-fatal — log but don't fail the transaction
-      console.warn('Order sync warning:', err instanceof Error ? err.message : err);
-    }
+    await this.client.api.syncOrder(txHash, marketType);
   }
 
   /**
    * Retrieves exact cost including taxes before buying.
+   * @param fill - shares to fill in wei (18 decimals)
    */
   async getBuyOrderCost(marketToken: Address, orderId: bigint, fill: bigint) {
     return this.client.publicClient.readContract({
@@ -166,6 +166,7 @@ export class OrderBookModule {
 
   /**
    * Preview how many shares can be bought for a given USDB amount on a P2P order.
+   * @param usdbAmount - USDB amount in wei (18 decimals)
    */
   async getBuyOrderAmountsOut(marketToken: Address, orderId: bigint, usdbAmount: bigint) {
     return this.client.publicClient.readContract({

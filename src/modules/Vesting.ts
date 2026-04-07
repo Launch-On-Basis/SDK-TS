@@ -13,11 +13,7 @@ export class VestingModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   private async approveIfNeeded(tokenAddress: Address, spender: Address, amount: bigint) {
@@ -60,6 +56,11 @@ export class VestingModule {
   /**
    * Creates a gradual vesting schedule.
    * Auto-approves the token to the vesting contract and attaches the creation fee.
+   *
+   * @param totalAmount - token amount in wei (18 decimals)
+   * @param startTime - Unix timestamp in seconds
+   * @param durationInDays - integer, number of days
+   * @param timeUnit - enum: 0=Second, 1=Minute, 2=Hour, 3=Day
    */
   async createGradualVesting(
     beneficiary: Address,
@@ -93,13 +94,16 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
 
   /**
    * Creates a cliff vesting schedule.
+   *
+   * @param totalAmount - token amount in wei (18 decimals)
+   * @param unlockTime - Unix timestamp in seconds
    */
   async createCliffVesting(
     beneficiary: Address,
@@ -128,7 +132,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -152,7 +156,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -176,7 +180,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -212,7 +216,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -244,6 +248,11 @@ export class VestingModule {
   /**
    * Creates gradual vesting schedules for multiple beneficiaries in a single transaction.
    * Auto-approves the sum of all amounts and attaches the creation fee.
+   *
+   * @param totalAmounts - token amounts in wei (18 decimals)
+   * @param startTime - Unix timestamp in seconds
+   * @param durationInDays - integer, number of days
+   * @param timeUnit - enum: 0=Second, 1=Minute, 2=Hour, 3=Day
    */
   async batchCreateGradualVesting(
     beneficiaries: Address[],
@@ -277,7 +286,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -285,6 +294,9 @@ export class VestingModule {
   /**
    * Creates cliff vesting schedules for multiple beneficiaries in a single transaction.
    * Auto-approves the sum of all amounts and attaches the creation fee.
+   *
+   * @param totalAmounts - token amounts in wei (18 decimals)
+   * @param unlockTime - Unix timestamp in seconds
    */
   async batchCreateCliffVesting(
     beneficiaries: Address[],
@@ -315,7 +327,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -339,13 +351,15 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
 
   /**
    * Extends the vesting period by additional days.
+   *
+   * @param additionalDays - integer, number of days
    */
   async extendVestingPeriod(vestingId: bigint, additionalDays: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -363,7 +377,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -371,6 +385,8 @@ export class VestingModule {
   /**
    * Adds more tokens to an existing vesting schedule.
    * Auto-approves the token to the vesting contract.
+   *
+   * @param additionalAmount - token amount in wei (18 decimals)
    */
   async addTokensToVesting(vestingId: bigint, additionalAmount: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -393,7 +409,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -417,7 +433,7 @@ export class VestingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     return { hash, receipt };
   }
@@ -460,6 +476,9 @@ export class VestingModule {
 
   /**
    * Returns vesting IDs for a given token within a specified index range.
+   *
+   * @param startIndex - array index
+   * @param endIndex - array index
    */
   async getTokenVestingIds(token: Address, startIndex: bigint, endIndex: bigint): Promise<bigint[]> {
     return this.client.publicClient.readContract({

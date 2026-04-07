@@ -12,15 +12,13 @@ export class TaxesModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   /**
    * Returns the effective tax rate (in basis points) for a specific token and user.
+   * @param token - token contract address
+   * @param user - user wallet address
    */
   async getTaxRate(token: Address, user: Address): Promise<bigint> {
     return this.client.publicClient.readContract({
@@ -33,6 +31,7 @@ export class TaxesModule {
 
   /**
    * Returns the current surge tax rate (in basis points) for a token.
+   * @param token - token contract address
    */
   async getCurrentSurgeTax(token: Address): Promise<bigint> {
     return this.client.publicClient.readContract({
@@ -45,6 +44,7 @@ export class TaxesModule {
 
   /**
    * Returns the available surge quota for a token.
+   * @param token - token contract address
    */
   async getAvailableSurgeQuota(token: Address): Promise<bigint> {
     return this.client.publicClient.readContract({
@@ -87,6 +87,10 @@ export class TaxesModule {
 
   /**
    * Start a decaying surge tax on a factory token. Only callable by the token's DEV.
+   * @param startRate - basis points (0-10000)
+   * @param endRate - basis points (0-10000)
+   * @param duration - duration in seconds
+   * @param token - token contract address
    */
   async startSurgeTax(startRate: bigint, endRate: bigint, duration: bigint, token: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -101,12 +105,13 @@ export class TaxesModule {
     });
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * End an active surge tax early. Only callable by the token's DEV.
+   * @param token - token contract address
    */
   async endSurgeTax(token: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -121,12 +126,15 @@ export class TaxesModule {
     });
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Add a developer revenue share wallet for a token. Only callable by the token's DEV.
+   * @param token - token contract address
+   * @param wallet - revenue share recipient address
+   * @param basisPoints - basis points (0-10000)
    */
   async addDevShare(token: Address, wallet: Address, basisPoints: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -141,12 +149,14 @@ export class TaxesModule {
     });
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
   /**
    * Remove a developer revenue share wallet. Only callable by the token's DEV.
+   * @param token - token contract address
+   * @param wallet - revenue share recipient address
    */
   async removeDevShare(token: Address, wallet: Address) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -161,7 +171,7 @@ export class TaxesModule {
     });
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 }

@@ -13,11 +13,7 @@ export class FactoryModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   /**
@@ -83,6 +79,11 @@ export class FactoryModule {
    * 4. Creates metadata on IPFS (name, symbol, description auto-read from chain)
    *
    * Returns { hash, receipt, tokenAddress, imageUrl, metadata }
+   *
+   * @param options.hybridMultiplier - raw integer (not wei) — controls floor price rise speed
+   * @param options.usdbForBonding - USDB amount in wei (18 decimals)
+   * @param options.startLP - initial liquidity in wei (18 decimals)
+   * @param options.imageUrl - URL of the token image (required)
    */
   async createTokenWithMetadata(options: {
     symbol: string;
@@ -144,7 +145,7 @@ export class FactoryModule {
     });
 
     // Sync the creation tx
-    this._syncTx(createResult.hash);
+    await this._syncTx(createResult.hash);
 
     return {
       hash: createResult.hash,
@@ -169,10 +170,13 @@ export class FactoryModule {
 
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return receipt;
   }
 
+  /**
+   * @param amount - token amount in wei (18 decimals)
+   */
   async setWhitelistedWallet(tokenAddress: Address, wallets: Address[], amount: bigint, tag: string) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error("Wallet account is required.");
@@ -188,7 +192,7 @@ export class FactoryModule {
 
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return receipt;
   }
 
@@ -268,7 +272,7 @@ export class FactoryModule {
     });
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -311,7 +315,7 @@ export class FactoryModule {
 
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return receipt;
   }
 }

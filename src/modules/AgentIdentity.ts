@@ -27,6 +27,17 @@ export interface AgentConfig {
   capabilities?: string[];
 }
 
+export class AgentSyncError extends Error {
+  public hash: string;
+  public agentId: bigint;
+  constructor(message: string, hash: string, agentId: bigint) {
+    super(message);
+    this.name = 'AgentSyncError';
+    this.hash = hash;
+    this.agentId = agentId;
+  }
+}
+
 export class AgentIdentityModule {
   private client: BasisClient;
   private registryAddress: Address;
@@ -37,11 +48,7 @@ export class AgentIdentityModule {
   }
 
   private async _syncTx(txHash: string) {
-    try {
-      await this.client.api.syncTransaction(txHash);
-    } catch (e: any) {
-      console.warn('Sync warning:', e.message || e);
-    }
+    await this.client.api.syncTransaction(txHash);
   }
 
   /**
@@ -79,10 +86,33 @@ export class AgentIdentityModule {
   }
 
   /**
+   * Look up the agentId for a wallet by scanning Registered events on-chain.
+   * Returns the agentId or null if not found.
+   */
+  async getAgentIdFromChain(wallet: Address): Promise<bigint | null> {
+    const logs = await this.client.publicClient.getLogs({
+      address: this.registryAddress,
+      event: {
+        type: 'event',
+        name: 'Registered',
+        inputs: [
+          { indexed: true, name: 'agentId', type: 'uint256' },
+          { indexed: false, name: 'agentURI', type: 'string' },
+          { indexed: true, name: 'owner', type: 'address' },
+        ],
+      },
+      args: { owner: wallet },
+      fromBlock: 0n,
+      toBlock: 'latest',
+    });
+    if (logs.length === 0) return null;
+    // Return the most recent registration
+    return (logs[logs.length - 1].args as any).agentId as bigint;
+  }
+
+  /**
    * Register the current wallet as an ERC-8004 agent.
-   * Returns the agentId.
-   *
-   * If already registered on-chain, returns null (check via isRegistered first).
+   * Returns the agentId. Always syncs to backend — throws on sync failure.
    */
   async register(config?: AgentConfig): Promise<{ hash: string; agentId: bigint }> {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -103,7 +133,7 @@ export class AgentIdentityModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    this._syncTx(hash);
+    await this._syncTx(hash);
 
     // Parse agentId from Registered event
     let agentId = 0n;
@@ -121,6 +151,26 @@ export class AgentIdentityModule {
           }
         } catch {}
       }
+    }
+
+    // Force sync to backend API — retry up to 3 times
+    let syncErr: Error | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.syncToApi(account.address, agentId, config);
+        syncErr = null;
+        break;
+      } catch (e: any) {
+        syncErr = e;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+    if (syncErr) {
+      throw new AgentSyncError(
+        `On-chain registration succeeded (agentId: ${agentId}, tx: ${hash}) but backend sync failed after 3 attempts: ${syncErr.message}. Call registerAndSync() to retry.`,
+        hash,
+        agentId,
+      );
     }
 
     return { hash, agentId };
@@ -147,27 +197,27 @@ export class AgentIdentityModule {
     let agentId: bigint;
 
     if (alreadyRegistered) {
-      // Try to load from API
-      try {
-        const apiAgent = await this.lookupFromApi(address);
-        if (apiAgent && apiAgent.isAgent) {
-          return BigInt(apiAgent.agent.agentId);
-        }
-      } catch {}
-      // Can't determine agentId without API — return 0
-      return 0n;
+      // Check if API already has it
+      const apiAgent = await this.lookupFromApi(address);
+      if (apiAgent && apiAgent.isAgent) {
+        return BigInt(apiAgent.agent.agentId);
+      }
+      // On-chain but not in API — get real agentId from chain events, then force sync
+      const chainAgentId = await this.getAgentIdFromChain(address);
+      if (chainAgentId === null) {
+        throw new Error('Agent shows as registered (balanceOf > 0) but no Registered event found on-chain');
+      }
+      await this.syncToApi(address, chainAgentId, config);
+      const synced = await this.lookupFromApi(address);
+      if (synced && synced.isAgent) {
+        return BigInt(synced.agent.agentId);
+      }
+      throw new Error('Agent registered on-chain but backend sync failed — API still shows isAgent: false');
     }
 
-    // Register on-chain
+    // Register on-chain (register() already forces sync)
     const result = await this.register(config);
     agentId = result.agentId;
-
-    // Sync to backend API
-    try {
-      await this.syncToApi(address, agentId, config);
-    } catch (err) {
-      console.warn('Agent API sync warning:', err instanceof Error ? err.message : err);
-    }
 
     return agentId;
   }
@@ -175,7 +225,7 @@ export class AgentIdentityModule {
   /**
    * Sync agent registration to the backend API.
    */
-  private async syncToApi(wallet: string, agentId: bigint, config?: AgentConfig): Promise<void> {
+  async syncToApi(wallet: string, agentId: bigint, config?: AgentConfig): Promise<void> {
     const cookie = this.client.sessionCookie;
     if (!cookie) return;
 
@@ -277,7 +327,7 @@ export class AgentIdentityModule {
 
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
-    this._syncTx(hash);
+    await this._syncTx(hash);
     return { hash, receipt };
   }
 }

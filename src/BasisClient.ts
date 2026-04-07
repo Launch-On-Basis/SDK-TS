@@ -72,6 +72,7 @@ export interface BasisClientOptions {
   privateKey?: `0x${string}`;
   apiKey?: string;
   apiDomain?: string;
+  /** If true (default), transactions try BSC Megafuel (zero gas) first, falling back to regular RPC. */
   gasless?: boolean;
 
   // Contract Addresses
