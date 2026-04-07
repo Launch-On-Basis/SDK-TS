@@ -95,7 +95,8 @@ The `client.api` object provides 60+ methods for off-chain data:
 - **Auto-approval** — token allowances are handled automatically before every transaction
 - **Auto-sync** — every write method syncs to the backend database via `POST /api/v1/sync`
 - **SIWE authentication** — `BasisClient.create()` handles the full wallet sign-in flow
-- **Bundled creation** — `createTokenWithMetadata` and `createMarketWithMetadata` force image + IPFS metadata upload (no orphaned tokens)
+- **Bundled creation** — `createTokenWithMetadata` and `createMarketWithMetadata` force image + IPFS metadata upload (no orphaned tokens). Accepts image URL or raw file (Buffer/Blob).
+- **Avatar management** — `setAvatar()` uploads and sets profile picture in one call
 - **Dual format** — ESM and CJS builds with full TypeScript declarations
 
 ## Phase 1

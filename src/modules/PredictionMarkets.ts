@@ -120,7 +120,8 @@ export class PredictionMarketsModule {
     bonding?: bigint;
     seedAmount?: bigint;
     description?: string;
-    imageUrl: string;
+    imageUrl?: string;
+    imageFile?: Blob | Buffer;
     website?: string;
     telegram?: string;
     twitterx?: string;
@@ -154,7 +155,15 @@ export class PredictionMarketsModule {
     }
 
     // Upload image
-    const imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl, marketTokenAddress);
+    if (!options.imageUrl && !options.imageFile) {
+      throw new Error('Either imageUrl or imageFile is required.');
+    }
+    let imageUrl: string;
+    if (options.imageFile) {
+      imageUrl = await this.client.api.uploadImage(options.imageFile, `${marketTokenAddress}.webp`, 'token', marketTokenAddress);
+    } else {
+      imageUrl = await this.client.api.uploadImageFromUrl(options.imageUrl!, marketTokenAddress);
+    }
 
     // Create metadata
     const metadata = await this.client.api.updateMetadata({
