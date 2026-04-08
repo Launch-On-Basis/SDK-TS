@@ -12,7 +12,7 @@ TypeScript/JavaScript SDK for the Basis DeFi protocol on BNB Chain.
 ## Install
 
 ```bash
-npm install github:Launch-On-Basis/basis-sdk
+npm install github:Launch-On-Basis/SDK-TS
 ```
 
 ## Quick Start

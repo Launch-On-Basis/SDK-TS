@@ -38,6 +38,8 @@ export interface Token {
   createdAt: string;
   lastActivityAt?: string;
   predictionOptions?: Array<{ index: number; name: string }>;
+  liquidityUSD?: number;
+  startingLiquidityUSD?: number;
   [key: string]: unknown;
 }
 
