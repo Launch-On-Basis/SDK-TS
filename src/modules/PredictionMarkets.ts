@@ -74,6 +74,12 @@ export class PredictionMarketsModule {
       args: [maintoken],
     }) as any;
     const factoryAddress = ecoData.factory ?? ecoData[0];
+    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+    if (!factoryAddress || factoryAddress === ZERO_ADDRESS) {
+      throw new Error(
+        `Token ${maintoken} is not a registered ecosystem token — cannot create a market under it. Use an existing ecosystem token address as maintoken.`
+      );
+    }
     const feeAmount = await this.client.publicClient.readContract({
       address: factoryAddress,
       abi: ATokenFactoryArtifact.abi,
@@ -97,7 +103,6 @@ export class PredictionMarketsModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
-    await this._syncTx(hash);
     return { hash, receipt };
   }
 
@@ -115,7 +120,7 @@ export class PredictionMarketsModule {
     symbol: string;
     endTime: bigint;
     optionNames: string[];
-    maintoken: Address;
+    maintoken?: Address;
     frozen?: boolean;
     bonding?: bigint;
     seedAmount?: bigint;
@@ -126,12 +131,19 @@ export class PredictionMarketsModule {
     telegram?: string;
     twitterx?: string;
   }) {
+    // 0. Validate image up front — fail before spending gas
+    if (!options.imageUrl && !options.imageFile) {
+      throw new Error('Either imageUrl or imageFile is required.');
+    }
+
+    const maintoken = options.maintoken ?? this.client.mainTokenAddress;
+
     const createResult = await this.createMarket(
       options.marketName,
       options.symbol,
       options.endTime,
       options.optionNames,
-      options.maintoken,
+      maintoken,
       options.frozen ?? false,
       options.bonding ?? 0n,
       options.seedAmount ?? 0n,
@@ -155,9 +167,6 @@ export class PredictionMarketsModule {
     }
 
     // Upload image
-    if (!options.imageUrl && !options.imageFile) {
-      throw new Error('Either imageUrl or imageFile is required.');
-    }
     let imageUrl: string;
     if (options.imageFile) {
       imageUrl = await this.client.api.uploadImage(options.imageFile, `${marketTokenAddress}.webp`, 'token', marketTokenAddress);

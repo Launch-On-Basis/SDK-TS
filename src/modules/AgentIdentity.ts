@@ -86,28 +86,25 @@ export class AgentIdentityModule {
   }
 
   /**
-   * Look up the agentId for a wallet by scanning Registered events on-chain.
-   * Returns the agentId or null if not found.
+   * Extract the agentId from a registration transaction receipt.
+   * Parses the Registered event emitted by the Identity Registry.
    */
-  async getAgentIdFromChain(wallet: Address): Promise<bigint | null> {
-    const logs = await this.client.publicClient.getLogs({
-      address: this.registryAddress,
-      event: {
-        type: 'event',
-        name: 'Registered',
-        inputs: [
-          { indexed: true, name: 'agentId', type: 'uint256' },
-          { indexed: false, name: 'agentURI', type: 'string' },
-          { indexed: true, name: 'owner', type: 'address' },
-        ],
-      },
-      args: { owner: wallet },
-      fromBlock: 0n,
-      toBlock: 'latest',
-    });
-    if (logs.length === 0) return null;
-    // Return the most recent registration
-    return (logs[logs.length - 1].args as any).agentId as bigint;
+  async getAgentIdFromTx(txHash: `0x${string}`): Promise<bigint | null> {
+    const receipt = await this.client.publicClient.getTransactionReceipt({ hash: txHash });
+    for (const log of receipt.logs) {
+      if (log.address.toLowerCase() !== this.registryAddress.toLowerCase()) continue;
+      try {
+        const decoded = decodeEventLog({
+          abi: identityRegistryAbi,
+          data: log.data,
+          topics: log.topics,
+        });
+        if (decoded.eventName === 'Registered') {
+          return (decoded.args as any).agentId as bigint;
+        }
+      } catch {}
+    }
+    return null;
   }
 
   /**
@@ -182,9 +179,13 @@ export class AgentIdentityModule {
    * 2. If not, register on-chain
    * 3. Save to backend API
    *
+   * If already registered on-chain but not synced to the API, pass
+   * the original registration txHash to recover the agentId from
+   * the transaction receipt.
+   *
    * Returns the agentId.
    */
-  async registerAndSync(config?: AgentConfig): Promise<bigint> {
+  async registerAndSync(config?: AgentConfig, txHash?: `0x${string}`): Promise<bigint> {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error('Wallet required to register as agent.');
     }
@@ -202,10 +203,16 @@ export class AgentIdentityModule {
       if (apiAgent && apiAgent.isAgent) {
         return BigInt(apiAgent.agent.agentId);
       }
-      // On-chain but not in API — get real agentId from chain events, then force sync
-      const chainAgentId = await this.getAgentIdFromChain(address);
+      // On-chain but not in API — need txHash to recover agentId from receipt
+      if (!txHash) {
+        throw new Error(
+          'Already registered on-chain but not synced to API. ' +
+          'Provide your registration txHash to recover: registerAndSync(config, txHash)'
+        );
+      }
+      const chainAgentId = await this.getAgentIdFromTx(txHash);
       if (chainAgentId === null) {
-        throw new Error('Agent shows as registered (balanceOf > 0) but no Registered event found on-chain');
+        throw new Error('Could not parse agentId from transaction receipt');
       }
       await this.syncToApi(address, chainAgentId, config);
       const synced = await this.lookupFromApi(address);

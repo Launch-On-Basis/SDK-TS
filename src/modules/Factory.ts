@@ -103,6 +103,11 @@ export class FactoryModule {
     telegram?: string;
     twitterx?: string;
   }) {
+    // 0. Validate image up front — fail before spending gas
+    if (!options.imageUrl && !options.imageFile) {
+      throw new Error('Either imageUrl or imageFile is required.');
+    }
+
     // 1. Create token on-chain
     const createResult = await this.createToken(
       options.symbol,
@@ -134,9 +139,6 @@ export class FactoryModule {
     }
 
     // 3. Upload image
-    if (!options.imageUrl && !options.imageFile) {
-      throw new Error('Either imageUrl or imageFile is required.');
-    }
     let imageUrl: string;
     if (options.imageFile) {
       imageUrl = await this.client.api.uploadImage(options.imageFile, `${tokenAddress}.webp`, 'token', tokenAddress);
