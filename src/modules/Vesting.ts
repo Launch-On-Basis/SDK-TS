@@ -43,11 +43,29 @@ export class VestingModule {
 
   private async getFeeAmount(): Promise<bigint> {
     try {
-      return await this.client.publicClient.readContract({
-        address: this.vestingAddress,
-        abi: AVestingArtifact.abi,
-        functionName: 'feeAmount',
-      }) as bigint;
+      const account = this.client.walletClient?.account?.address;
+      const [enabled, amount, whitelisted] = await Promise.all([
+        this.client.publicClient.readContract({
+          address: this.vestingAddress,
+          abi: AVestingArtifact.abi,
+          functionName: 'feeEnabled',
+        }) as Promise<boolean>,
+        this.client.publicClient.readContract({
+          address: this.vestingAddress,
+          abi: AVestingArtifact.abi,
+          functionName: 'feeAmount',
+        }) as Promise<bigint>,
+        account
+          ? this.client.publicClient.readContract({
+              address: this.vestingAddress,
+              abi: AVestingArtifact.abi,
+              functionName: 'feeWhitelist',
+              args: [account],
+            }) as Promise<boolean>
+          : Promise.resolve(false),
+      ]);
+      if (!enabled || whitelisted) return 0n;
+      return amount;
     } catch {
       return 0n;
     }
