@@ -236,6 +236,21 @@ export interface MyReferrals {
   referrals: ReferralUser[];
 }
 
+export type DailyCapPointCategory = 'trading' | 'prediction' | 'creator' | 'positions';
+export type DailyCapCountCategory = 'social_x' | 'social_moltbook';
+
+export interface DailyCapEntry<C extends string = string> {
+  category: C;
+  percent: number;
+}
+
+export interface MyDailyCaps {
+  date: string;
+  resetsInSeconds: number;
+  pointCaps: DailyCapEntry<DailyCapPointCategory>[];
+  countCaps: DailyCapEntry<DailyCapCountCategory>[];
+}
+
 // ---------------------------------------------------------------------------
 // BasisAPI — full off-chain API client
 // ---------------------------------------------------------------------------
@@ -1332,6 +1347,20 @@ export class BasisAPI {
    */
   async getMyReferrals(): Promise<MyReferrals> {
     const res = await this.fetchWithAuth('/api/v1/me/referrals');
+    return res.json();
+  }
+
+  /**
+   * GET /api/v1/me/daily-caps — today's cap-fill percentages for the
+   * authenticated wallet. Caps reset at 00:00 UTC.
+   *
+   * `pointCaps` always returns the four point-based categories
+   * (trading, prediction, creator, positions); `countCaps` returns the two
+   * count-based social categories (social_x, social_moltbook). Each `percent`
+   * is 0-100, rounded to 1 decimal, clamped at 100.
+   */
+  async getMyDailyCaps(): Promise<MyDailyCaps> {
+    const res = await this.fetchWithAuth('/api/v1/me/daily-caps');
     return res.json();
   }
 
