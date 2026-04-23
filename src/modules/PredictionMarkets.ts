@@ -18,6 +18,18 @@ export class PredictionMarketsModule {
   }
 
   /**
+   * Returns the contract's minimum seed amount required to create a market,
+   * in USDB wei (18 decimals). `createMarket` will revert if `seedAmount < minSeed`.
+   */
+  async getMinSeed(): Promise<bigint> {
+    return this.client.publicClient.readContract({
+      address: this.marketTradingAddress,
+      abi: AMarketTradingArtifact.abi,
+      functionName: 'minSeed',
+    }) as Promise<bigint>;
+  }
+
+  /**
    * Helper to approve tokens for the MarketTrading contract
    */
   private async approveIfNeeded(tokenAddress: Address, amount: bigint) {
@@ -66,18 +78,30 @@ export class PredictionMarketsModule {
       throw new Error("Stateful initialization (walletClient) is required for write methods.");
     }
 
-    // Read the ecosystem's factory address, then fetch the fee
-    const ecoData = await this.client.publicClient.readContract({
-      address: this.marketTradingAddress,
-      abi: AMarketTradingArtifact.abi,
-      functionName: 'ecosystems',
-      args: [maintoken],
-    }) as any;
+    // Read the ecosystem's factory address and the contract's minSeed in parallel
+    const [ecoData, minSeed] = await Promise.all([
+      this.client.publicClient.readContract({
+        address: this.marketTradingAddress,
+        abi: AMarketTradingArtifact.abi,
+        functionName: 'ecosystems',
+        args: [maintoken],
+      }) as Promise<any>,
+      this.client.publicClient.readContract({
+        address: this.marketTradingAddress,
+        abi: AMarketTradingArtifact.abi,
+        functionName: 'minSeed',
+      }) as Promise<bigint>,
+    ]);
     const factoryAddress = ecoData.factory ?? ecoData[0];
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     if (!factoryAddress || factoryAddress === ZERO_ADDRESS) {
       throw new Error(
         `Token ${maintoken} is not a registered ecosystem token — cannot create a market under it. Use an existing ecosystem token address as maintoken.`
+      );
+    }
+    if (seedAmount < minSeed) {
+      throw new Error(
+        `seedAmount (${seedAmount}) is below the contract minimum (${minSeed} wei = ${Number(minSeed) / 1e18} USDB). Pass a larger seedAmount.`
       );
     }
     const feeAmount = await this.client.publicClient.readContract({

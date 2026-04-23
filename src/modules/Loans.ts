@@ -1,5 +1,6 @@
 import { BasisClient } from '../BasisClient';
 import ALoanHubArtifact from '../abis/ALOAN_HUB.json';
+import IMainCoreArtifact from '../abis/IMAIN_CORE.json';
 import IERC20Artifact from '../abis/IERC20.json';
 import { Address } from 'viem';
 
@@ -116,17 +117,33 @@ export class LoansModule {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error("Stateful initialization (walletClient) is required for write methods.");
     }
+    const user = this.client.walletClient.account.address;
 
-    // If paying in USDB, approve a generous amount to cover the extension fee
+    // If paying in USDB, approve the exact extension fee. Preview the
+    // fee via the ecosystem's ExtensionEligibility — the same call the
+    // hub performs internally — so allowance always covers the actual
+    // pull, even when the caller's USDB balance is below the fee.
     if (payInStable) {
-      const usdbBalance = await this.client.publicClient.readContract({
-        address: this.client.usdbAddress,
-        abi: IERC20Artifact.abi,
-        functionName: 'balanceOf',
-        args: [this.client.walletClient.account.address],
-      }) as bigint;
-      if (usdbBalance > 0n) {
-        await this.approveIfNeeded(this.client.usdbAddress, this.loanHubAddress, usdbBalance);
+      const userLoan = await this.client.publicClient.readContract({
+        address: this.loanHubAddress,
+        abi: ALoanHubArtifact.abi,
+        functionName: 'userLoans',
+        args: [user, hubId],
+      }) as readonly [Address, bigint, Address];
+      const [ecosystem, coreLoanId] = userLoan;
+
+      const eligibility = await this.client.publicClient.readContract({
+        address: ecosystem,
+        abi: IMainCoreArtifact.abi,
+        functionName: 'ExtensionEligibility',
+        args: [this.loanHubAddress, coreLoanId, addDays, false, true, refinance],
+      }) as readonly [boolean, bigint, bigint];
+      const possible = eligibility[0];
+      const fee = eligibility[1];
+      if (!possible) throw new Error('Extension not possible under current loan state.');
+
+      if (fee > 0n) {
+        await this.approveIfNeeded(this.client.usdbAddress, this.loanHubAddress, fee);
       }
     }
 

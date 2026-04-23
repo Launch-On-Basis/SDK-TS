@@ -42,6 +42,31 @@ export class PrivateMarketsModule {
     await this.client.api.syncTransaction(txHash);
   }
 
+  /**
+   * Returns the contract's minimum seed amount required to create a public
+   * (non-private) market, in USDB wei (18 decimals). Public markets are
+   * subject to a higher floor than private ones.
+   */
+  async getMinSeedPublic(): Promise<bigint> {
+    return this.client.publicClient.readContract({
+      address: this.privateMarketAddress,
+      abi: APrivateTradingMarketArtifact.abi,
+      functionName: 'minSeedPublic',
+    }) as Promise<bigint>;
+  }
+
+  /**
+   * Returns the contract's minimum seed amount required to create a
+   * private (voter-panel) market, in USDB wei (18 decimals). Often 0.
+   */
+  async getMinSeedPrivate(): Promise<bigint> {
+    return this.client.publicClient.readContract({
+      address: this.privateMarketAddress,
+      abi: APrivateTradingMarketArtifact.abi,
+      functionName: 'minSeedPrivate',
+    }) as Promise<bigint>;
+  }
+
   private async syncOrder(txHash: string): Promise<void> {
     await this.client.api.syncOrder(txHash, 'private');
   }
@@ -68,18 +93,32 @@ export class PrivateMarketsModule {
       throw new Error("Stateful initialization (walletClient) is required for write methods.");
     }
 
-    // Get the ecosystem's factory address, then fetch the fee
-    const ecoData = await this.client.publicClient.readContract({
-      address: this.privateMarketAddress,
-      abi: APrivateTradingMarketArtifact.abi,
-      functionName: 'ecosystems',
-      args: [maintoken],
-    }) as any;
+    // Get the ecosystem's factory + the appropriate minSeed in parallel
+    const minSeedFn = privateEvent ? 'minSeedPrivate' : 'minSeedPublic';
+    const [ecoData, minSeed] = await Promise.all([
+      this.client.publicClient.readContract({
+        address: this.privateMarketAddress,
+        abi: APrivateTradingMarketArtifact.abi,
+        functionName: 'ecosystems',
+        args: [maintoken],
+      }) as Promise<any>,
+      this.client.publicClient.readContract({
+        address: this.privateMarketAddress,
+        abi: APrivateTradingMarketArtifact.abi,
+        functionName: minSeedFn,
+      }) as Promise<bigint>,
+    ]);
     const factoryAddress = ecoData.factory ?? ecoData[0];
     const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
     if (!factoryAddress || factoryAddress === ZERO_ADDRESS) {
       throw new Error(
         `Token ${maintoken} is not a registered ecosystem token — cannot create a market under it. Use an existing ecosystem token address as maintoken.`
+      );
+    }
+    if (seedAmount < minSeed) {
+      const kind = privateEvent ? 'private' : 'public';
+      throw new Error(
+        `seedAmount (${seedAmount}) is below the contract minimum for ${kind} markets (${minSeed} wei = ${Number(minSeed) / 1e18} USDB). Pass a larger seedAmount.`
       );
     }
     const feeAmount = await this.client.publicClient.readContract({

@@ -1,5 +1,7 @@
 import { BasisClient } from '../BasisClient';
 import AStasisVaultArtifact from '../abis/AStasisVault.json';
+import ALoanHubArtifact from '../abis/ALOAN_HUB.json';
+import IMainCoreArtifact from '../abis/IMAIN_CORE.json';
 import IERC20Artifact from '../abis/IERC20.json';
 import { Address } from 'viem';
 
@@ -14,6 +16,27 @@ export class StakingModule {
 
   private async _syncTx(txHash: string) {
     await this.client.api.syncTransaction(txHash);
+  }
+
+  /** Reads the caller's active staking loan: { hubId, loanHubAddress }. Throws if none. */
+  private async _getActiveStakingLoan(user: Address): Promise<{ hubId: bigint; loanHubAddress: Address }> {
+    const vault = await this.client.publicClient.readContract({
+      address: this.stakingAddress,
+      abi: AStasisVaultArtifact.abi,
+      functionName: 'userVaults',
+      args: [user],
+    }) as readonly [bigint, bigint, bigint, boolean];
+    const hubId = vault[2];
+    const hasActiveLoan = vault[3];
+    if (!hasActiveLoan) throw new Error('No active staking loan for this wallet.');
+
+    const loanHubAddress = await this.client.publicClient.readContract({
+      address: this.stakingAddress,
+      abi: AStasisVaultArtifact.abi,
+      functionName: 'loanHub',
+    }) as Address;
+
+    return { hubId, loanHubAddress };
   }
 
   private async approveIfNeeded(tokenAddress: Address, spender: Address, amount: bigint) {
@@ -173,22 +196,28 @@ export class StakingModule {
   }
 
   /**
-   * Repays the active staking loan. Auto-approves USDB to the staking contract.
+   * Repays the active staking loan. Auto-approves the exact USDB debt
+   * to the staking contract (read from the loan hub). Throws if the
+   * caller has no active staking loan.
    */
   async repay() {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error("Stateful initialization (walletClient) is required for write methods.");
     }
+    const user = this.client.walletClient.account.address;
 
-    // Approve USDB to the staking contract for repayment
-    const usdbBalance = await this.client.publicClient.readContract({
-      address: this.client.usdbAddress,
-      abi: IERC20Artifact.abi,
-      functionName: 'balanceOf',
-      args: [this.client.walletClient.account.address],
-    }) as bigint;
-    if (usdbBalance > 0n) {
-      await this.approveIfNeeded(this.client.usdbAddress, this.stakingAddress, usdbBalance);
+    const { hubId, loanHubAddress } = await this._getActiveStakingLoan(user);
+
+    // Borrower-of-record on the loan hub is the staking vault itself, not the user.
+    const details = await this.client.publicClient.readContract({
+      address: loanHubAddress,
+      abi: ALoanHubArtifact.abi,
+      functionName: 'getUserLoanDetails',
+      args: [this.stakingAddress, hubId],
+    }) as any;
+    const fullAmount = (details.fullAmount ?? details[7]) as bigint;
+    if (fullAmount > 0n) {
+      await this.approveIfNeeded(this.client.usdbAddress, this.stakingAddress, fullAmount);
     }
 
     const { request } = await this.client.publicClient.simulateContract({
@@ -206,8 +235,9 @@ export class StakingModule {
   }
 
   /**
-   * Extends the active staking loan.
-   * @param daysToAdd - integer, minimum 10
+   * Extends the active staking loan. When `payInUSDB` is true, auto-approves
+   * the exact extension fee (read from the ecosystem's ExtensionEligibility).
+   * @param daysToAdd - integer, minimum 10 (or 0 with refinance = true)
    * @param payInUSDB - whether to pay extension fee in USDB
    * @param refinance - whether to refinance the loan
    */
@@ -215,17 +245,33 @@ export class StakingModule {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error("Stateful initialization (walletClient) is required for write methods.");
     }
+    const user = this.client.walletClient.account.address;
 
-    // If paying in USDB, approve a generous amount to cover the extension fee
     if (payInUSDB) {
-      const usdbBalance = await this.client.publicClient.readContract({
-        address: this.client.usdbAddress,
-        abi: IERC20Artifact.abi,
-        functionName: 'balanceOf',
-        args: [this.client.walletClient.account.address],
-      }) as bigint;
-      if (usdbBalance > 0n) {
-        await this.approveIfNeeded(this.client.usdbAddress, this.stakingAddress, usdbBalance);
+      const { hubId, loanHubAddress } = await this._getActiveStakingLoan(user);
+
+      // userLoans(stakingVault, hubId) -> (ecosystem, coreLoanId, collateralToken)
+      const userLoan = await this.client.publicClient.readContract({
+        address: loanHubAddress,
+        abi: ALoanHubArtifact.abi,
+        functionName: 'userLoans',
+        args: [this.stakingAddress, hubId],
+      }) as readonly [Address, bigint, Address];
+      const [ecosystem, coreLoanId] = userLoan;
+
+      // Preview the exact fee the ecosystem will charge for this extension
+      const eligibility = await this.client.publicClient.readContract({
+        address: ecosystem,
+        abi: IMainCoreArtifact.abi,
+        functionName: 'ExtensionEligibility',
+        args: [loanHubAddress, coreLoanId, daysToAdd, false, true, refinance],
+      }) as readonly [boolean, bigint, bigint];
+      const possible = eligibility[0];
+      const fee = eligibility[1];
+      if (!possible) throw new Error('Extension not possible under current loan state.');
+
+      if (fee > 0n) {
+        await this.approveIfNeeded(this.client.usdbAddress, this.stakingAddress, fee);
       }
     }
 

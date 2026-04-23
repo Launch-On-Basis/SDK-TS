@@ -1,5 +1,6 @@
 import { BasisClient } from '../BasisClient';
 import AVestingArtifact from '../abis/A_VestingContract.json';
+import ALoanHubArtifact from '../abis/ALOAN_HUB.json';
 import IERC20Artifact from '../abis/IERC20.json';
 import { Address } from 'viem';
 
@@ -205,22 +206,66 @@ export class VestingModule {
 
   /**
    * Repays a loan taken on a vesting schedule.
-   * Auto-approves the borrowed token (USDB) to the vesting contract.
+   *
+   * Auto-approves the exact debt of the borrowed token to the vesting
+   * contract. Reads `vestingSchedules(id).ecosystem` and
+   * `ecosystems(maintoken).mainpair` to discover the borrow token
+   * (typically USDB but ecosystem-defined), then reads the loan's
+   * `fullAmount` from the loan hub. If the underlying loan is no longer
+   * active (already repaid / liquidated), no approval is performed —
+   * the contract handles cleanup paths without a transferFrom.
    */
   async repayLoanOnVesting(vestingId: bigint) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error("Stateful initialization (walletClient) is required for write methods.");
     }
 
-    // Approve USDB (the borrowed token) to the vesting contract for repayment
-    const usdbBalance = await this.client.publicClient.readContract({
-      address: this.client.usdbAddress,
-      abi: IERC20Artifact.abi,
-      functionName: 'balanceOf',
-      args: [this.client.walletClient.account.address],
+    // 1. Find the active loan id; bail early if none.
+    const activeLoanId = await this.client.publicClient.readContract({
+      address: this.vestingAddress,
+      abi: AVestingArtifact.abi,
+      functionName: 'getActiveLoan',
+      args: [vestingId],
     }) as bigint;
-    if (usdbBalance > 0n) {
-      await this.approveIfNeeded(this.client.usdbAddress, this.vestingAddress, usdbBalance);
+    if (activeLoanId === 0n) {
+      throw new Error('No active loan on this vesting schedule.');
+    }
+
+    // 2. Discover the borrow token via the schedule's ecosystem.
+    const schedule = await this.client.publicClient.readContract({
+      address: this.vestingAddress,
+      abi: AVestingArtifact.abi,
+      functionName: 'vestingSchedules',
+      args: [vestingId],
+    }) as any;
+    const ecosystem = (schedule.ecosystem ?? schedule[3]) as Address;
+    const eco = await this.client.publicClient.readContract({
+      address: this.vestingAddress,
+      abi: AVestingArtifact.abi,
+      functionName: 'ecosystems',
+      args: [ecosystem],
+    }) as readonly [Address, Address, Address];
+    const borrowedToken = eco[2]; // mainpair
+
+    // 3. Read the actual debt from the loan hub. Borrower-of-record is
+    //    the vesting contract itself, not msg.sender.
+    const loanHubAddress = await this.client.publicClient.readContract({
+      address: this.vestingAddress,
+      abi: AVestingArtifact.abi,
+      functionName: 'LOAN',
+    }) as Address;
+    const details = await this.client.publicClient.readContract({
+      address: loanHubAddress,
+      abi: ALoanHubArtifact.abi,
+      functionName: 'getUserLoanDetails',
+      args: [this.vestingAddress, activeLoanId],
+    }) as any;
+    const isActive = (details.active ?? details[12]) as boolean;
+    const fullAmount = (details.fullAmount ?? details[7]) as bigint;
+
+    // 4. Approve only if the contract will actually pull funds.
+    if (isActive && fullAmount > 0n) {
+      await this.approveIfNeeded(borrowedToken, this.vestingAddress, fullAmount);
     }
 
     const { request } = await this.client.publicClient.simulateContract({
