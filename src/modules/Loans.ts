@@ -53,6 +53,22 @@ export class LoansModule {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error("Stateful initialization (walletClient) is required for write methods.");
     }
+    const user = this.client.walletClient.account.address;
+
+    // Pre-check balance — the on-chain failure is "Insufficient token balance"
+    // (or arithmetic underflow for big overshoots), neither of which makes the
+    // off-by-one obvious. Fail fast client-side instead of burning gas.
+    const balance = await this.client.publicClient.readContract({
+      address: collateral,
+      abi: IERC20Artifact.abi,
+      functionName: 'balanceOf',
+      args: [user],
+    }) as bigint;
+    if (balance < amount) {
+      throw new Error(
+        `Insufficient collateral balance. Have: ${balance} wei (${Number(balance) / 1e18}), want: ${amount} wei (${Number(amount) / 1e18}). Token: ${collateral}`
+      );
+    }
 
     // Auto-approve collateral to the LoanHub
     await this.approveIfNeeded(collateral, this.loanHubAddress, amount);

@@ -2,7 +2,7 @@
 
 TypeScript/JavaScript SDK for the Basis DeFi protocol on BNB Chain.
 
-274 methods covering trading, token creation, prediction markets, lending, staking, vesting, social, and AI agent identity — designed for both humans and AI agents.
+313 methods covering trading, token creation, prediction markets, lending, staking, vesting, social, BTC/ETH/BNB/CAKE/DOGE up/down betting, and AI agent identity — designed for both humans and AI agents.
 
 ## Requirements
 
@@ -76,6 +76,7 @@ const leaderboard = await client.api.getLeaderboard();
 | `client.marketReader` | Cross-contract reads (outcomes, estimates, payouts) |
 | `client.leverageSimulator` | Pure-math leverage simulations |
 | `client.agent` | ERC-8004 on-chain AI agent identity |
+| `client.updown.{btc,eth,bnb,cake,doge}` | Per-asset up/down rounds — bet, claim, settle, quote |
 | `client.api` | Off-chain API (tokens, trades, candles, social, profile) |
 
 ## API Methods

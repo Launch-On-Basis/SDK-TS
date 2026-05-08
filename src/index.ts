@@ -13,3 +13,4 @@ export * from './modules/MarketReader';
 export * from './modules/LeverageSimulator';
 export * from './modules/Taxes';
 export * from './modules/AgentIdentity';
+export * from './modules/UpDown';

@@ -251,6 +251,120 @@ export interface MyDailyCaps {
   countCaps: DailyCapEntry<DailyCapCountCategory>[];
 }
 
+// --- Up/Down API types -------------------------------------------------------
+//
+// All on-chain numeric values are returned as **decimal strings** (preserves
+// uint256 / int256 precision). USDB amounts are 18-dec; prices are Chainlink
+// 8-dec. ISO 8601 strings for timestamps (note: on-chain reads return unix
+// seconds as bigint — these API fields are pre-formatted).
+
+export type UpDownAssetKey = 'btc' | 'eth' | 'bnb' | 'cake' | 'doge';
+export type UpDownSideStr = 'bull' | 'bear';
+export type UpDownOutcomeStr = 'pending' | 'bull_wins' | 'bear_wins' | 'canceled';
+
+const UPDOWN_TOKENS: readonly UpDownAssetKey[] = ['btc', 'eth', 'bnb', 'cake', 'doge'];
+
+// Defense-in-depth runtime validators. TS callers using `as any` or JS callers
+// can otherwise slip garbage into URL paths (`token="../foo"`, `tf=true`, etc.).
+function validateUpDownToken(token: unknown): asserts token is UpDownAssetKey {
+  if (typeof token !== 'string' || !UPDOWN_TOKENS.includes(token as UpDownAssetKey)) {
+    throw new Error(`token must be one of ${UPDOWN_TOKENS.join(', ')} (got ${JSON.stringify(token)})`);
+  }
+}
+function validateUpDownTf(tf: unknown): asserts tf is number {
+  if (typeof tf !== 'number' || !Number.isInteger(tf) || tf < 0 || tf > 4) {
+    throw new Error(`tf must be an integer 0-4 (got ${JSON.stringify(tf)})`);
+  }
+}
+function validateUpDownRoundId(roundId: unknown): void {
+  if (typeof roundId === 'bigint') {
+    if (roundId < 1n) throw new Error(`roundId must be a positive integer (got ${roundId})`);
+    return;
+  }
+  if (typeof roundId !== 'number' || !Number.isInteger(roundId) || roundId < 1) {
+    throw new Error(`roundId must be a positive integer (got ${JSON.stringify(roundId)})`);
+  }
+}
+
+export interface UpDownRoundSummary {
+  contract: string;
+  tf: number;                    // 0-4
+  roundId: number;
+  startTime: string;             // ISO 8601
+  endTime: string;
+  settledAt: string | null;
+  startPriceUsd8dec: string;
+  endPriceUsd8dec: string | null;
+  endPriceRoundId: string | null;
+  bullPoolUsdb: string;
+  bearPoolUsdb: string;
+  sharesBull: string;
+  sharesBear: string;
+  seedBonusUsdb: string;
+  outcome: UpDownOutcomeStr;
+  settler: string | null;
+}
+
+export interface UpDownRoundsList {
+  token: UpDownAssetKey;
+  rounds: UpDownRoundSummary[];
+  pagination: { limit: number; hasMore: boolean; nextCursor: string | null };
+}
+
+export interface UpDownRoundDetail {
+  token: UpDownAssetKey;
+  round: UpDownRoundSummary;
+  bets: {
+    totalEvents: number;
+    distinctBettors: number;
+    bull: { bettors: number; stakeUsdb: string; sharesTotal: string };
+    bear: { bettors: number; stakeUsdb: string; sharesTotal: string };
+  };
+  claims: {
+    total: number;
+    won: number;
+    refunded: number;
+    totalPayoutUsdb: string;
+  };
+}
+
+export interface UpDownActiveBet {
+  token: UpDownAssetKey;
+  contract: string;
+  tf: number;
+  roundId: number;
+  side: UpDownSideStr;
+  stakeUsdb: string;
+  placedAt: string;
+  endTime: string;
+}
+
+export interface UpDownClaimableBet {
+  token: UpDownAssetKey;
+  contract: string;
+  tf: number;
+  roundId: number;
+  side: UpDownSideStr;
+  stakeUsdb: string;
+  outcome: UpDownOutcomeStr;
+}
+
+export interface MyUpDown {
+  wallet: string;
+  totalBetEvents: number;
+  distinctRoundsBet: number;
+  totalStakeUsdb: string;
+  totalPayoutUsdb: string;
+  netUsdb: string;                 // can be negative
+  wins: number;
+  losses: number;
+  refunds: number;
+  activeBetsCount: number;
+  claimableCount: number;
+  activeBets: UpDownActiveBet[];
+  claimableBets: UpDownClaimableBet[];
+}
+
 // ---------------------------------------------------------------------------
 // BasisAPI — full off-chain API client
 // ---------------------------------------------------------------------------
@@ -1361,6 +1475,75 @@ export class BasisAPI {
    */
   async getMyDailyCaps(): Promise<MyDailyCaps> {
     const res = await this.fetchWithAuth('/api/v1/me/daily-caps');
+    return res.json();
+  }
+
+  // -----------------------------------------------------------------------
+  // Up/Down
+  // -----------------------------------------------------------------------
+
+  /**
+   * GET /api/v1/me/updown — aggregate UPDOWN bet/claim summary for the
+   * authenticated wallet across every Up/Down asset and all timeframes.
+   * Returns one summary blob with embedded `activeBets[]` and `claimableBets[]` arrays.
+   *
+   * To get the exact USDB amount a `claimableBets` entry will pay, call
+   * `client.updown[token].quoteClaimPayout(tf, roundId, user)` on-chain.
+   */
+  async getMyUpDown(): Promise<MyUpDown> {
+    const res = await this.fetchWithAuth('/api/v1/me/updown');
+    return res.json();
+  }
+
+  /**
+   * GET /api/v1/updown/rounds — paginated list of rounds for a given token,
+   * newest-first per timeframe. Cursor pagination via roundId (descending).
+   *
+   * **API key required.** Unlike `getMyUpDown()`, this endpoint does NOT
+   * accept SIWE — call `BasisClient.create({ privateKey })` (which auto-
+   * provisions a key) or pass `apiKey` explicitly.
+   */
+  async getUpDownRounds(options: {
+    token: UpDownAssetKey;
+    tf?: number;
+    outcome?: UpDownOutcomeStr;
+    cursor?: string;
+    limit?: number;
+  }): Promise<UpDownRoundsList> {
+    if (!this.client.apiKey) {
+      throw new Error('API key required for getUpDownRounds (this endpoint does not accept SIWE).');
+    }
+    validateUpDownToken(options.token);
+    if (options.tf !== undefined) validateUpDownTf(options.tf);
+    const params = new URLSearchParams({ token: options.token });
+    if (options.tf !== undefined) params.set('tf', String(options.tf));
+    if (options.outcome) params.set('outcome', options.outcome);
+    if (options.cursor) params.set('cursor', options.cursor);
+    if (options.limit !== undefined) params.set('limit', String(options.limit));
+    const res = await this.fetchWithAuth(`/api/v1/updown/rounds?${params.toString()}`);
+    return res.json();
+  }
+
+  /**
+   * GET /api/v1/updown/rounds/{token}/{tf}/{roundId} — single round with
+   * aggregate bet/claim statistics. Per-bettor wallet lists are NOT returned —
+   * use `getMyUpDown()` for per-wallet history (or query on-chain via getLogs).
+   *
+   * **API key required.** Same auth model as `getUpDownRounds` — SIWE is not
+   * accepted by this endpoint.
+   */
+  async getUpDownRound(token: UpDownAssetKey, tf: number, roundId: bigint | number): Promise<UpDownRoundDetail> {
+    if (!this.client.apiKey) {
+      throw new Error('API key required for getUpDownRound (this endpoint does not accept SIWE).');
+    }
+    // Defense-in-depth for callers who slip through TS types via `as any`.
+    // Without this, `tf="../foo" as any` would path-inject.
+    validateUpDownToken(token);
+    validateUpDownTf(tf);
+    validateUpDownRoundId(roundId);
+    const res = await this.fetchWithAuth(
+      `/api/v1/updown/rounds/${encodeURIComponent(token)}/${tf}/${roundId}`,
+    );
     return res.json();
   }
 

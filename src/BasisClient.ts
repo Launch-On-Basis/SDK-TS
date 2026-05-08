@@ -66,6 +66,7 @@ import { MarketReaderModule } from './modules/MarketReader';
 import { LeverageSimulatorModule } from './modules/LeverageSimulator';
 import { TaxesModule } from './modules/Taxes';
 import { AgentIdentityModule, AgentConfig } from './modules/AgentIdentity';
+import { UpDownModule } from './modules/UpDown';
 
 export interface BasisClientOptions {
   rpcUrl?: string;
@@ -92,6 +93,9 @@ export interface BasisClientOptions {
   usdbAddress?: Address;
   mainTokenAddress?: Address;
 
+  // Up/Down — per-asset deployments. Zero address means "not deployed yet".
+  upDownAddresses?: { btc?: Address; eth?: Address; bnb?: Address; cake?: Address; doge?: Address };
+
   // ERC-8004 Agent Identity
   agent?: boolean | AgentConfig;
 }
@@ -111,6 +115,13 @@ const DEFAULT_ADDRESSES = {
   reader: '0xF406cA6403c57Ad04c8E13F4ae87b3732daa087d',
   leverage: '0xeffb140d821c5B20EFc66346Cf414EeAC8A8FDB2',
   taxes: '0x4501d1279273c44dA483842ED17b5451e7d3A601',
+  upDown: {
+    btc: '0xFB6B61F0F7A099d32FF161eb1c2e17ca265759fa',
+    eth: '0xE58b057aCe79Ea0CB9724d9a0eF9B8DD8E95b257',
+    bnb: '0x3E7d6c2cCE12A5102B612331a4C85cB9d8553979',
+    cake: '0xbA6c7C5f98d9b55cF072811156d366AD68537256',
+    doge: '0x2Eda68AB78089C83E9998BAa966caa9A1A181945',
+  },
 } as const;
 
 export class BasisClient {
@@ -138,6 +149,7 @@ export class BasisClient {
   public leverageSimulator: LeverageSimulatorModule;
   public taxes: TaxesModule;
   public agent: AgentIdentityModule;
+  public updown: UpDownModule;
 
   // Auth state
   private _sessionCookie: string | null = null;
@@ -237,6 +249,17 @@ export class BasisClient {
     this.leverageSimulator = new LeverageSimulatorModule(this, options.leverageAddress || DEFAULT_ADDRESSES.leverage);
     this.taxes = new TaxesModule(this, options.taxesAddress || DEFAULT_ADDRESSES.taxes);
     this.agent = new AgentIdentityModule(this);
+
+    // Per-key fallback: a partial override like { btc: '0x...' } keeps the
+    // hardcoded defaults for the other assets instead of silently nulling them.
+    const udOverrides = options.upDownAddresses || {};
+    this.updown = new UpDownModule(this, {
+      btc:  (udOverrides.btc  ?? DEFAULT_ADDRESSES.upDown.btc)  as Address,
+      eth:  (udOverrides.eth  ?? DEFAULT_ADDRESSES.upDown.eth)  as Address,
+      bnb:  (udOverrides.bnb  ?? DEFAULT_ADDRESSES.upDown.bnb)  as Address,
+      cake: (udOverrides.cake ?? DEFAULT_ADDRESSES.upDown.cake) as Address,
+      doge: (udOverrides.doge ?? DEFAULT_ADDRESSES.upDown.doge) as Address,
+    });
   }
 
   /**
@@ -283,38 +306,63 @@ export class BasisClient {
       }
     }
 
-    // Fetch remote contract addresses and warn on mismatch
+    // Validate hardcoded defaults against the canonical contracts.json. If the
+    // remote is reachable AND any address differs, throw a fatal error — the
+    // SDK is out of date and the caller MUST update before doing anything.
+    // If contracts.json is unreachable (network failure, backend down, etc.),
+    // silently fall back to hardcoded defaults so the SDK still works offline.
+    let remote: any = null;
     try {
-      const res = await fetch(`${client.apiDomain}/contracts.json`);
-      if (res.ok) {
-        const remote = await res.json();
-        const mapping: [string, string, string][] = [
-          ['factory', remote.factory, DEFAULT_ADDRESSES.factory],
-          ['swap', remote.swap, DEFAULT_ADDRESSES.swap],
-          ['marketTrading', remote.marketTrading, DEFAULT_ADDRESSES.marketTrading],
-          ['loanHub', remote.loanHub, DEFAULT_ADDRESSES.loanHub],
-          ['vesting', remote.vesting, DEFAULT_ADDRESSES.vesting],
-          ['usdb', remote.usdb, DEFAULT_ADDRESSES.usdb],
-          ['mainToken', remote.mainToken, DEFAULT_ADDRESSES.mainToken],
-          ['staking', remote.staking, DEFAULT_ADDRESSES.staking],
-          ['resolver', remote.resolver, DEFAULT_ADDRESSES.resolver],
-          ['privateMarket', remote.privateMarket, DEFAULT_ADDRESSES.privateMarket],
-          ['reader', remote.reader, DEFAULT_ADDRESSES.reader],
-          ['leverage', remote.leverage, DEFAULT_ADDRESSES.leverage],
-          ['taxes', remote.taxes, DEFAULT_ADDRESSES.taxes],
-        ];
-        const mismatched = mapping.filter(([, remoteAddr, defaultAddr]) =>
-          remoteAddr && remoteAddr.toLowerCase() !== defaultAddr.toLowerCase()
-        );
-        if (mismatched.length > 0) {
-          console.warn(
-            `[basis-sdk] Contract addresses have changed. Please update your SDK to the latest version.\n` +
-            `Mismatched: ${mismatched.map(([name]) => name).join(', ')}`
-          );
+      // 5s timeout so a slow / hung backend doesn't deadlock SDK init.
+      // Matches the Python SDK's `timeout=5` on the same call.
+      const res = await fetch(`${client.apiDomain}/contracts.json`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) remote = await res.json();
+    } catch {
+      // Remote unreachable / timed out / non-JSON — fall back silently. Skip validation.
+    }
+    if (remote) {
+      // Note: any throw below propagates. We deliberately don't wrap this in a
+      // try/catch — if the mismatch-detection logic has a bug, we want it to
+      // surface, not silently swallow into the hardcoded-fallback path.
+      const mapping: [string, string, string][] = [
+        ['factory', remote.factory, DEFAULT_ADDRESSES.factory],
+        ['swap', remote.swap, DEFAULT_ADDRESSES.swap],
+        ['marketTrading', remote.marketTrading, DEFAULT_ADDRESSES.marketTrading],
+        ['loanHub', remote.loanHub, DEFAULT_ADDRESSES.loanHub],
+        ['vesting', remote.vesting, DEFAULT_ADDRESSES.vesting],
+        ['usdb', remote.usdb, DEFAULT_ADDRESSES.usdb],
+        ['mainToken', remote.mainToken, DEFAULT_ADDRESSES.mainToken],
+        ['staking', remote.staking, DEFAULT_ADDRESSES.staking],
+        ['resolver', remote.resolver, DEFAULT_ADDRESSES.resolver],
+        ['privateMarket', remote.privateMarket, DEFAULT_ADDRESSES.privateMarket],
+        ['reader', remote.reader, DEFAULT_ADDRESSES.reader],
+        ['leverage', remote.leverage, DEFAULT_ADDRESSES.leverage],
+        ['taxes', remote.taxes, DEFAULT_ADDRESSES.taxes],
+      ];
+      // upDown lives in a nested object; flatten each known asset address into the mismatch check.
+      if (remote.upDown && typeof remote.upDown === 'object') {
+        for (const asset of ['btc', 'eth', 'bnb', 'cake', 'doge'] as const) {
+          const remoteAddr = remote.upDown[asset];
+          if (typeof remoteAddr === 'string') {
+            mapping.push([`upDown.${asset}`, remoteAddr, DEFAULT_ADDRESSES.upDown[asset]]);
+          }
         }
       }
-    } catch {
-      // Remote unreachable — continue with hardcoded defaults
+      const mismatched = mapping.filter(([, remoteAddr, defaultAddr]) =>
+        typeof remoteAddr === 'string' && remoteAddr.toLowerCase() !== defaultAddr.toLowerCase()
+      );
+      if (mismatched.length > 0) {
+        const lines = mismatched.map(([name, remoteAddr, defaultAddr]) =>
+          `  ${name}: SDK has ${defaultAddr}, contracts.json has ${remoteAddr}`
+        );
+        throw new Error(
+          `[basis-sdk] Contract address mismatch with ${client.apiDomain}/contracts.json. ` +
+          `One side is stale — either update the SDK (npm i basis-sdk@latest) or update contracts.json on the backend so they agree.\n` +
+          `Mismatched (${mismatched.length}):\n${lines.join('\n')}`
+        );
+      }
     }
 
     // ERC-8004 Agent Identity registration
