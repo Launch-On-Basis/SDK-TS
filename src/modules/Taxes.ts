@@ -16,6 +16,45 @@ export class TaxesModule {
   }
 
   /**
+   * Returns the dev's accumulated USDB earnings on a specific token, in 18-dec wei.
+   *
+   * The Up/Basis tax model is push-based: tokens accrue dev tax to this counter,
+   * and when `distributeTax(token)` fires (called internally on contract events),
+   * the accumulated amount is paid out to the dev wallets per their basis-point
+   * shares. This getter reads the un-distributed accrued balance.
+   *
+   * @param token - token contract address
+   * @param dev - dev wallet address
+   * @returns accumulated unpaid USDB earnings, 18-dec wei
+   */
+  async getCreatorEarnings(token: Address, dev: Address): Promise<bigint> {
+    return this.client.publicClient.readContract({
+      address: this.taxesAddress,
+      abi: ATaxesArtifact.abi,
+      functionName: 'tokenDevEarnings',
+      args: [token, dev],
+    }) as Promise<bigint>;
+  }
+
+  /**
+   * Returns the dev's lifetime distributed earnings across every token they
+   * have a share on, in 18-dec USDB wei. This is the cumulative paid-out total,
+   * not the un-distributed accrual — for that, use `getCreatorEarnings(token, dev)`
+   * per token.
+   *
+   * @param dev - dev wallet address
+   * @returns lifetime paid-out USDB earnings, 18-dec wei
+   */
+  async getDevTotalEarnings(dev: Address): Promise<bigint> {
+    return this.client.publicClient.readContract({
+      address: this.taxesAddress,
+      abi: ATaxesArtifact.abi,
+      functionName: 'devTotalEarnings',
+      args: [dev],
+    }) as Promise<bigint>;
+  }
+
+  /**
    * Returns the effective tax rate (in basis points) for a specific token and user.
    * @param token - token contract address
    * @param user - user wallet address

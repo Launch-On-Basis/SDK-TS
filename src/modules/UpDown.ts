@@ -15,6 +15,50 @@ import { Address } from 'viem';
  *  - `NoValidPriceInWindow` — no Chainlink round in the lookback window had
  *    `updatedAt >= round.endTime`
  */
+/**
+ * Options for `betBull` / `betBear`. Backward-compatible: callers passing a
+ * raw `bigint` as the third argument get the legacy `minShares` shorthand.
+ */
+export interface BetOptions {
+  /** Slippage protection — throws if `quoteShares < minShares`. Default `0n` (no check). */
+  minShares?: bigint;
+  /**
+   * If true (default), auto-settle/cancel a stale-pending round before
+   * submitting the bet. Catches the common case where a bot tries to bet on
+   * a round that ended but nobody settled — without auto-advance the contract
+   * rejects with `BettingClosed`.
+   *
+   * Errors during the inner `advanceRound` call are silently swallowed —
+   * the bet's own pre-checks / contract reverts surface anything that matters.
+   */
+  autoAdvance?: boolean;
+  /**
+   * Delay after a successful auto-advance before submitting the bet, in ms.
+   * Lets RPC replication catch up so the next read reflects the new round.
+   * Default `500`. Set to `0` for instant follow-up (own RPC, no LB).
+   */
+  autoAdvanceDelayMs?: number;
+  /**
+   * Cap on how long the inner `advanceRound` polls the Chainlink price feed
+   * before giving up. Lower than `advanceRound`'s own default 6min because
+   * we silently swallow the failure here — don't want to hang bots that
+   * are doing nothing but `betBull` calls. Default `30000` (30s).
+   */
+  autoAdvanceMaxWaitMs?: number;
+}
+
+function normalizeBetOptions(opts: bigint | BetOptions): Required<BetOptions> {
+  if (typeof opts === 'bigint') {
+    return { minShares: opts, autoAdvance: true, autoAdvanceDelayMs: 500, autoAdvanceMaxWaitMs: 30_000 };
+  }
+  return {
+    minShares: opts.minShares ?? 0n,
+    autoAdvance: opts.autoAdvance ?? true,
+    autoAdvanceDelayMs: opts.autoAdvanceDelayMs ?? 500,
+    autoAdvanceMaxWaitMs: opts.autoAdvanceMaxWaitMs ?? 30_000,
+  };
+}
+
 export class OracleNotReadyError extends Error {
   readonly tf: number;
   readonly endTime: bigint;
@@ -301,30 +345,92 @@ export class UpDownAssetModule {
 
   /**
    * Place a bullish bet on the current round of `tf`. Auto-approves USDB.
-   * Pre-checks `amount >= minBet` and `usdb.balanceOf(user) >= amount` before sending.
    *
-   * @param minShares - optional slippage protection. If non-zero, throws
-   *   client-side when `quoteShares(tf, BULL, amount) < minShares` so the SDK
-   *   never burns gas on a bet that would mint fewer shares than expected.
-   *   Default 0 = no slippage check.
+   * **Default behavior auto-advances stale-pending rounds.** If the current
+   * round is past `endTime` but nobody has settled it yet, the contract
+   * would reject the bet with `BettingClosed`. By default, the SDK detects
+   * this and calls `advanceRound` first, then bets on the freshly-opened
+   * next round. Set `autoAdvance: false` to opt out.
+   *
+   * Pre-checks: `amount >= minBet`, `usdb.balanceOf(user) >= amount`, and
+   * `quoteShares > 0` (catches `ZeroShares` from slippage crush).
+   *
+   * @param tf - Timeframe enum (0=5m, 1=15m, 2=1h, 3=4h, 4=24h)
+   * @param amount - Stake in USDB 18-dec wei
+   * @param opts - Either a bigint (legacy `minShares` shorthand) or a
+   *   `BetOptions` object. Both forms are supported for backward compatibility.
+   *
+   * @example
+   * // Simplest call — auto-advances any stale round, no slippage protection
+   * await client.updown.btc.betBull(0, parseUnits('1', 18));
+   *
+   * @example
+   * // Legacy minShares positional — still works
+   * await client.updown.btc.betBull(0, parseUnits('1', 18), parseUnits('1.95', 18));
+   *
+   * @example
+   * // Full opts — opt out of auto-advance, with slippage and longer RPC settle
+   * await client.updown.btc.betBull(0, parseUnits('1', 18), {
+   *   minShares: parseUnits('1.95', 18),
+   *   autoAdvance: false,
+   * });
    */
-  async betBull(tf: number, amount: bigint, minShares: bigint = 0n) {
-    return this._bet(tf, Side.BULL, amount, minShares, 'betBull');
+  async betBull(tf: number, amount: bigint, opts: bigint | BetOptions = 0n) {
+    return this._bet(tf, Side.BULL, amount, normalizeBetOptions(opts), 'betBull');
   }
 
   /**
    * Place a bearish bet on the current round of `tf`. Auto-approves USDB.
-   * See `betBull` for slippage protection details.
+   * See `betBull` for the full options (auto-advance, slippage protection, etc.).
    */
-  async betBear(tf: number, amount: bigint, minShares: bigint = 0n) {
-    return this._bet(tf, Side.BEAR, amount, minShares, 'betBear');
+  async betBear(tf: number, amount: bigint, opts: bigint | BetOptions = 0n) {
+    return this._bet(tf, Side.BEAR, amount, normalizeBetOptions(opts), 'betBear');
   }
 
-  private async _bet(tf: number, side: Side, amount: bigint, minShares: bigint, fnName: 'betBull' | 'betBear') {
+  private async _bet(tf: number, side: Side, amount: bigint, opts: Required<BetOptions>, fnName: 'betBull' | 'betBear') {
     if (!this.client.walletClient || !this.client.walletClient.account) {
       throw new Error('Stateful initialization (walletClient) is required for write methods.');
     }
     const user = this.client.walletClient.account.address;
+
+    // Auto-advance: if the current round is stale-pending (past endTime but not
+    // settled), try to settle/cancel it before betting. The inner advanceRound
+    // does its own _syncTx — that sync MUST run if the tx hits chain.
+    //
+    // We only swallow EXPECTED race conditions (someone else advanced first,
+    // round transitioned mid-flight, oracle stalled). Real failures — sync
+    // errors, wallet config, RPC outages — propagate so the caller sees them
+    // and the always-sync invariant isn't silently violated.
+    if (opts.autoAdvance) {
+      try {
+        const cur = await this.getCurrentRound(tf);
+        if (cur && cur.round.outcome === 0 /* Pending */) {
+          const now = BigInt(Math.floor(Date.now() / 1000));
+          if (now > cur.round.endTime) {
+            await this.advanceRound(tf, { maxWaitMs: opts.autoAdvanceMaxWaitMs });
+            if (opts.autoAdvanceDelayMs > 0) {
+              await new Promise((r) => setTimeout(r, opts.autoAdvanceDelayMs));
+            }
+          }
+        }
+      } catch (e: any) {
+        const errName = e?.cause?.data?.errorName ?? '';
+        const msg = e?.message ?? '';
+        const isExpectedRace =
+          // Settle attempt revert from a stale oracle (typed via settleCurrentRound)
+          e instanceof OracleNotReadyError ||
+          // Inner advanceRound's _waitForOracle gave up after autoAdvanceMaxWaitMs
+          /Chainlink price feed .* has not updated/.test(msg) ||
+          // Contract reverts that mean someone else advanced first / state changed mid-flight
+          errName === 'RoundAlreadySettled' ||
+          errName === 'TooEarlyToSettle' ||
+          errName === 'NoActiveRound' ||
+          // Pre-check ValueErrors raised before any tx hit chain
+          /already settled|still in progress|Settle window|No active round/.test(msg);
+        if (!isExpectedRace) throw e;
+        // else: swallow — bet's own pre-checks surface anything that matters.
+      }
+    }
 
     // Pre-check minBet — clearer than the on-chain InvalidAmount revert.
     const min = await this.minBet();
@@ -351,8 +457,8 @@ export class UpDownAssetModule {
         'Bet would mint 0 shares due to pool skew + slippage. Consider betting the underdog side or waiting for the round to balance.'
       );
     }
-    if (minShares > 0n && projected < minShares) {
-      throw new Error(`Slippage: quoteShares would mint ${projected} shares, below minShares (${minShares}).`);
+    if (opts.minShares > 0n && projected < opts.minShares) {
+      throw new Error(`Slippage: quoteShares would mint ${projected} shares, below minShares (${opts.minShares}).`);
     }
 
     await this._approveUsdbIfNeeded(amount);

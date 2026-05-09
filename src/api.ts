@@ -251,6 +251,28 @@ export interface MyDailyCaps {
   countCaps: DailyCapEntry<DailyCapCountCategory>[];
 }
 
+export type MyOrderStatus = 'ACTIVE' | 'FILLED' | 'CANCELLED';
+
+export interface MyOrder {
+  id: number;
+  orderId: string;
+  marketToken: string;
+  seller: string;
+  outcomeId: number;
+  /** USDB 18-dec wei (decimal string) */
+  amount: string;
+  /** USDB 18-dec wei (decimal string) */
+  pricePerShare: string;
+  status: MyOrderStatus;
+  /** ISO 8601 */
+  createdAt: string;
+}
+
+export interface MyOrders {
+  data: MyOrder[];
+  pagination: Pagination;
+}
+
 // --- Up/Down API types -------------------------------------------------------
 //
 // All on-chain numeric values are returned as **decimal strings** (preserves
@@ -1475,6 +1497,39 @@ export class BasisAPI {
    */
   async getMyDailyCaps(): Promise<MyDailyCaps> {
     const res = await this.fetchWithAuth('/api/v1/me/daily-caps');
+    return res.json();
+  }
+
+  /**
+   * GET /api/v1/me/orders — paginated list of the authenticated wallet's
+   * order-book orders across all prediction markets. Auth: SIWE session OR
+   * API key.
+   *
+   * @param options.status - filter by order status. Default: all statuses.
+   * @param options.marketToken - narrow to a single market.
+   * @param options.outcomeId - narrow to a single outcome (0-indexed).
+   * @param options.page - default 1.
+   * @param options.limit - default 20.
+   * @returns `{ data: MyOrder[], pagination: { page, limit, total, totalPages } }`.
+   *   Each `MyOrder` exposes `{ id, orderId, marketToken, seller, outcomeId,
+   *   amount, pricePerShare, status, createdAt }` — numeric on-chain values
+   *   are decimal strings (USDB 18-dec); `createdAt` is ISO 8601.
+   */
+  async getMyOrders(options?: {
+    status?: MyOrderStatus;
+    marketToken?: string;
+    outcomeId?: number;
+    page?: number;
+    limit?: number;
+  }): Promise<MyOrders> {
+    const params = new URLSearchParams();
+    if (options?.status) params.set('status', options.status);
+    if (options?.marketToken) params.set('marketToken', options.marketToken);
+    if (options?.outcomeId !== undefined) params.set('outcomeId', String(options.outcomeId));
+    if (options?.page !== undefined) params.set('page', String(options.page));
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    const qs = params.toString();
+    const res = await this.fetchWithAuth(`/api/v1/me/orders${qs ? `?${qs}` : ''}`);
     return res.json();
   }
 

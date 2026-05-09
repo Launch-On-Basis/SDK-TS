@@ -304,6 +304,31 @@ export class StakingModule {
   }
 
   /**
+   * Returns the active vault loan for `wallet`, or `null` if there is none.
+   *
+   * Reads `userVaults(wallet)` to discover the user's `hubId` + `hasActiveLoan`
+   * flag, then (if active) calls the loan hub's `getUserLoanDetails`. Note: the
+   * borrower-of-record on the loan hub for vault loans is the staking vault
+   * contract itself, NOT the user wallet — passing `wallet` here would read a
+   * different (typically empty) loan record. The SDK handles this correctly.
+   *
+   * @param wallet - the user's address
+   * @returns FullLoanDetails struct, or `null` if no active vault loan
+   */
+  async getVaultLoan(wallet: Address) {
+    const vault = await this.client.publicClient.readContract({
+      address: this.stakingAddress,
+      abi: AStasisVaultArtifact.abi,
+      functionName: 'userVaults',
+      args: [wallet],
+    }) as readonly [bigint, bigint, bigint, boolean];
+    const [, , hubId, hasActiveLoan] = vault;
+    if (!hasActiveLoan) return null;
+    // borrower-of-record = staking vault, not the user
+    return this.client.loans.getUserLoanDetails(this.stakingAddress, hubId);
+  }
+
+  /**
    * Gets the available STASIS (collateral value minus pledged).
    */
   async getAvailableStasis(user: Address) {
