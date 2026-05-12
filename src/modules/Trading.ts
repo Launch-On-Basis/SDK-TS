@@ -4,10 +4,11 @@ import IERC20Artifact from '../abis/IERC20.json';
 import FactoryTokenArtifact from '../abis/FACTORYTOKEN.json';
 import { Address, getAddress, getContract } from 'viem';
 
-// Inline ABI for leverage view functions on MAINTOKEN (not in compiled artifact)
+// Inline ABI for leverage view + claim functions on MAINTOKEN (MAINTOKEN.json artifact is a stub)
 const leverageAbi = [
   {"inputs":[{"name":"","type":"address"}],"name":"leverageCount","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"name":"","type":"address"},{"name":"","type":"uint256"}],"name":"leverages","outputs":[{"name":"user","type":"address"},{"name":"token","type":"address"},{"name":"collateralAmount","type":"uint256"},{"name":"liquidatedAmount","type":"uint256"},{"name":"fullAmount","type":"uint256"},{"name":"borrowedAmount","type":"uint256"},{"name":"liquidationTime","type":"uint256"},{"name":"liquidationClaim","type":"uint256"},{"name":"isLiquidated","type":"bool"},{"name":"active","type":"bool"},{"name":"creationTime","type":"uint256"},{"name":"timeOfClosure","type":"uint256"},{"name":"leverage","type":"tuple","components":[{"name":"leverageBuyAmount","type":"uint256"},{"name":"cashedOut","type":"uint256"}]}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"name":"loanId","type":"uint256"},{"name":"isLeverage","type":"bool"}],"name":"ClaimLiquidation","outputs":[{"name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
 ] as const;
 
 export class TradingModule {
@@ -259,6 +260,62 @@ export class TradingModule {
     const hash = await this.client.writeContract(request);
     const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
 
+    await this._syncTx(hash);
+    return { hash, receipt };
+  }
+
+  /**
+   * Claims the residual tokens left over after a leverage position was
+   * liquidated. Calls `MAIN_TOKEN.ClaimLiquidation(loanId, true)` directly —
+   * leverage liquidations bypass the loan hub (the hub's `claimLiquidation`
+   * hardcodes `isLeverage = false`), so this is the only on-chain path to
+   * recover leverage liquidation residue.
+   *
+   * Pre-checks (cheap reads to avoid wasted gas):
+   *  - The leverage position must exist
+   *  - The position must be inactive (`!active`) — i.e. already liquidated
+   *  - `liquidationClaim > 0` — there's actually something to recover
+   *
+   * For hub-loan liquidation claims use `client.loans.claimLiquidation(hubId)`
+   * instead. For vault (staking) liquidation use `client.staking.settleLiquidation()`.
+   *
+   * @param loanId - the leverage position id (NOT the loan hub's hubId)
+   * @returns `{ hash, receipt }`
+   */
+  async claimLeverageLiquidation(loanId: bigint) {
+    if (!this.client.walletClient || !this.client.walletClient.account) {
+      throw new Error("Stateful initialization (walletClient) is required for write methods.");
+    }
+    const user = this.client.walletClient.account.address;
+
+    // Read the position to give clear client-side errors instead of opaque contract reverts.
+    const pos = await this.client.publicClient.readContract({
+      address: this.client.mainTokenAddress,
+      abi: leverageAbi,
+      functionName: 'leverages',
+      args: [user, loanId],
+    }) as any;
+    // Tuple shape (per leverageAbi): [user, token, collateralAmount, liquidatedAmount,
+    //   fullAmount, borrowedAmount, liquidationTime, liquidationClaim, isLiquidated,
+    //   active, creationTime, timeOfClosure, leverage(tuple)]
+    const liquidationClaim = pos[7] as bigint;
+    const active = pos[9] as boolean;
+    if (active) {
+      throw new Error(`Leverage position ${loanId} is still active — wait for liquidation before claiming.`);
+    }
+    if (liquidationClaim === 0n) {
+      throw new Error(`Nothing to claim on leverage position ${loanId} (liquidationClaim is 0 — either already claimed or no residue).`);
+    }
+
+    const { request } = await this.client.publicClient.simulateContract({
+      account: this.client.walletClient.account,
+      address: this.client.mainTokenAddress,
+      abi: leverageAbi,
+      functionName: 'ClaimLiquidation',
+      args: [loanId, true],   // isLeverage = true
+    });
+    const hash = await this.client.writeContract(request);
+    const receipt = await this.client.publicClient.waitForTransactionReceipt({ hash });
     await this._syncTx(hash);
     return { hash, receipt };
   }

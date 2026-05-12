@@ -2,7 +2,7 @@
 
 TypeScript/JavaScript SDK for the Basis DeFi protocol on BNB Chain.
 
-296 methods covering trading, token creation, prediction markets, lending, staking, vesting, social, BTC/ETH/BNB/CAKE/DOGE up/down betting, and AI agent identity — designed for both humans and AI agents.
+297 methods covering trading, token creation, prediction markets, lending, staking, vesting, social, BTC/ETH/BNB/CAKE/DOGE up/down betting, and AI agent identity — designed for both humans and AI agents.
 
 ## Requirements
 
