@@ -71,9 +71,19 @@ import { UpDownModule } from './modules/UpDown';
 export interface BasisClientOptions {
   rpcUrl?: string;
   privateKey?: `0x${string}`;
+  /**
+   * Injected signer for environments where no raw private key exists —
+   * embedded wallets (Privy, Web3Auth, Magic), browser wallets, MPC custody.
+   * Build it with an account set, e.g.:
+   *   createWalletClient({ account: address, chain: bsc, transport: custom(eip1193Provider) })
+   * Mutually exclusive with `privateKey` (privateKey wins if both are set).
+   * Note: `gasless` (MegaFuel) is unavailable in this mode — transaction
+   * submission is controlled by the injected provider, not the SDK transport.
+   */
+  walletClient?: WalletClient;
   apiKey?: string;
   apiDomain?: string;
-  /** If true (default), transactions try BSC Megafuel (zero gas) first, falling back to regular RPC. */
+  /** If true (default), transactions try BSC Megafuel (zero gas) first, falling back to regular RPC. Ignored when `walletClient` is injected. */
   gasless?: boolean;
 
   // Contract Addresses
@@ -220,6 +230,16 @@ export class BasisClient {
           transport: http(rpcUrl),
         });
       }
+    } else if (options.walletClient) {
+      // Injected signer (embedded/browser/MPC wallets). The provider owns
+      // transaction submission, so no gasless transport and no fallback.
+      if (!options.walletClient.account) {
+        throw new Error(
+          'Injected walletClient must have an account set. ' +
+          'Build it with createWalletClient({ account, chain: bsc, transport: custom(provider) }).'
+        );
+      }
+      this.walletClient = options.walletClient;
     }
 
     if (options.apiKey) {
@@ -266,7 +286,8 @@ export class BasisClient {
    * Async factory method that creates a fully initialized BasisClient.
    *
    * - Validates custom RPC URL by checking chainId === 56 (BSC).
-   * - If a privateKey is provided and no apiKey: authenticates via SIWE and auto-provisions an API key.
+   * - If a signer is provided (privateKey or injected walletClient) and no
+   *   apiKey: authenticates via SIWE and auto-provisions an API key.
    * - If an apiKey is provided: stores it directly.
    */
   static async create(options: BasisClientOptions = {}): Promise<BasisClient> {
@@ -293,10 +314,11 @@ export class BasisClient {
       }
     }
 
-    // If privateKey provided, always do SIWE auth (some endpoints require session)
-    if (options.privateKey) {
+    // If a signer is available (privateKey or injected walletClient), always
+    // do SIWE auth (some endpoints require session).
+    if (options.privateKey || options.walletClient) {
       if (!client.walletClient?.account) {
-        throw new Error('WalletClient was not initialized despite privateKey being provided.');
+        throw new Error('WalletClient was not initialized despite a signer being provided.');
       }
       const address = client.walletClient.account.address;
       await client.authenticate(address);
@@ -365,8 +387,10 @@ export class BasisClient {
       }
     }
 
-    // ERC-8004 Agent Identity registration
-    if (options.agent && options.privateKey) {
+    // ERC-8004 Agent Identity registration — works with any signer
+    // (privateKey or injected walletClient); registration is a normal
+    // contract write through client.writeContract.
+    if (options.agent && client.walletClient) {
       const agentConfig = typeof options.agent === 'object' ? options.agent : undefined;
       try {
         await client.agent.registerAndSync(agentConfig);

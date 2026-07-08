@@ -1,7 +1,7 @@
 {
   "name": "basis-sdk",
-  "version": "0.1.0-beta.1",
-  "description": "Basis DeFi SDK — trade, lend, stake, predict, and build on BNB Chain",
+  "version": "0.1.0-beta.2",
+  "description": "Basis DeFi SDK \u2014 trade, lend, stake, predict, and build on BNB Chain",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external sharp",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -41,7 +41,6 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "sharp": "^0.34.5",
     "siwe": "^3.0.0",
     "viem": "^2.21.0"
   },
@@ -55,5 +54,8 @@
     "src",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "optionalDependencies": {
+    "sharp": "^0.34.5"
+  }
 }

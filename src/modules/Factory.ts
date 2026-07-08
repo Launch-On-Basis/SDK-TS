@@ -13,7 +13,14 @@ export class FactoryModule {
   }
 
   private async _syncTx(txHash: string) {
-    await this.client.api.syncTransaction(txHash);
+    // Best-effort: the tx is already confirmed on-chain at this point — a
+    // sync hiccup must not surface as a failed transaction (callers would
+    // retry and double-spend). The block tracker indexes it soon regardless.
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, (e as Error)?.message);
+    }
   }
 
   /**

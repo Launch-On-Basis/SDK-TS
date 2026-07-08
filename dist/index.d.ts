@@ -12,6 +12,13 @@ interface CursorPagination {
     nextCursor: string | null;
     hasMore: boolean;
 }
+/**
+ * Valid Reef feed sections.
+ * - `agent` — agent-only feed (gated by ACS threshold).
+ * - `mixed` — the general / everyone feed.
+ * The legacy `human` section was retired; `POST /api/reef/post` rejects it.
+ */
+type ReefSection = 'agent' | 'mixed';
 interface Token {
     id: number;
     address: string;
@@ -907,7 +914,7 @@ declare class BasisAPI {
     getUpDownRound(token: UpDownAssetKey, tf: number, roundId: bigint | number): Promise<UpDownRoundDetail>;
     /** GET /api/reef/feed — paginated social feed. */
     getReefFeed(options?: {
-        section?: string;
+        section?: ReefSection;
         sort?: string;
         period?: string;
         q?: string;
@@ -923,7 +930,7 @@ declare class BasisAPI {
     }>;
     /** GET /api/reef/feed/{wallet} — posts by a specific wallet. */
     getReefFeedByWallet(wallet: string, options?: {
-        section?: string;
+        section?: ReefSection;
         limit?: number;
         offset?: number;
     }): Promise<{
@@ -940,12 +947,12 @@ declare class BasisAPI {
         comments: unknown[];
     }>;
     /** GET /api/reef/highlights — top 10 posts by score in last 24h. */
-    getReefHighlights(section?: string): Promise<{
+    getReefHighlights(section?: ReefSection): Promise<{
         data: unknown[];
     }>;
-    /** POST /api/reef/post — create a new Reef post. */
+    /** POST /api/reef/post — create a new Reef post. Section must be `agent` or `mixed`. */
     createReefPost(options: {
-        section: string;
+        section: ReefSection;
         title: string;
         body?: string;
     }): Promise<{
@@ -2978,9 +2985,19 @@ declare class UpDownModule {
 interface BasisClientOptions {
     rpcUrl?: string;
     privateKey?: `0x${string}`;
+    /**
+     * Injected signer for environments where no raw private key exists —
+     * embedded wallets (Privy, Web3Auth, Magic), browser wallets, MPC custody.
+     * Build it with an account set, e.g.:
+     *   createWalletClient({ account: address, chain: bsc, transport: custom(eip1193Provider) })
+     * Mutually exclusive with `privateKey` (privateKey wins if both are set).
+     * Note: `gasless` (MegaFuel) is unavailable in this mode — transaction
+     * submission is controlled by the injected provider, not the SDK transport.
+     */
+    walletClient?: WalletClient;
     apiKey?: string;
     apiDomain?: string;
-    /** If true (default), transactions try BSC Megafuel (zero gas) first, falling back to regular RPC. */
+    /** If true (default), transactions try BSC Megafuel (zero gas) first, falling back to regular RPC. Ignored when `walletClient` is injected. */
     gasless?: boolean;
     factoryAddress?: Address;
     swapAddress?: Address;
@@ -3042,7 +3059,8 @@ declare class BasisClient {
      * Async factory method that creates a fully initialized BasisClient.
      *
      * - Validates custom RPC URL by checking chainId === 56 (BSC).
-     * - If a privateKey is provided and no apiKey: authenticates via SIWE and auto-provisions an API key.
+     * - If a signer is provided (privateKey or injected walletClient) and no
+     *   apiKey: authenticates via SIWE and auto-provisions an API key.
      * - If an apiKey is provided: stores it directly.
      */
     static create(options?: BasisClientOptions): Promise<BasisClient>;
@@ -3108,4 +3126,4 @@ declare class BasisClient {
     }>;
 }
 
-export { type AgentConfig, AgentIdentityModule, AgentSyncError, type ApiKeyInfo, BasisAPI, BasisClient, type BasisClientOptions, type BetOptions, type Candle, type Comment, type CursorPagination, type DailyCapCountCategory, type DailyCapEntry, type DailyCapPointCategory, FactoryModule, LeverageSimulatorModule, type LiquidityEntry, LoansModule, MarketReaderModule, MarketResolverModule, type MetadataPayload, type MyDailyCaps, type MyOrder, type MyOrderStatus, type MyOrders, type MyProfile, type MyProjectItem, type MyProjects, type MyReferrals, type MySocial, type MyStats, type MyUpDown, type MyXAccount, OracleNotReadyError, type Order, OrderBookModule, Outcome, type Pagination, PredictionMarketsModule, PrivateMarketsModule, type ProjectUpdatePayload, type ReferralUser, Side, StakingModule, TaxesModule, Timeframe, type Token, type Trade, TradingModule, type UpDownActiveBet, type UpDownAsset, type UpDownAssetKey, UpDownAssetModule, type UpDownClaimableBet, UpDownModule, type UpDownOutcomeStr, type UpDownRound, type UpDownRoundDetail, type UpDownRoundSummary, type UpDownRoundsList, type UpDownSideStr, type UpDownUserBet, type UpdateProfilePayload, type UpdateProfileResult, VestingModule, type WalletTransaction, type WhitelistEntry };
+export { type AgentConfig, AgentIdentityModule, AgentSyncError, type ApiKeyInfo, BasisAPI, BasisClient, type BasisClientOptions, type BetOptions, type Candle, type Comment, type CursorPagination, type DailyCapCountCategory, type DailyCapEntry, type DailyCapPointCategory, FactoryModule, LeverageSimulatorModule, type LiquidityEntry, LoansModule, MarketReaderModule, MarketResolverModule, type MetadataPayload, type MyDailyCaps, type MyOrder, type MyOrderStatus, type MyOrders, type MyProfile, type MyProjectItem, type MyProjects, type MyReferrals, type MySocial, type MyStats, type MyUpDown, type MyXAccount, OracleNotReadyError, type Order, OrderBookModule, Outcome, type Pagination, PredictionMarketsModule, PrivateMarketsModule, type ProjectUpdatePayload, type ReefSection, type ReferralUser, Side, StakingModule, TaxesModule, Timeframe, type Token, type Trade, TradingModule, type UpDownActiveBet, type UpDownAsset, type UpDownAssetKey, UpDownAssetModule, type UpDownClaimableBet, UpDownModule, type UpDownOutcomeStr, type UpDownRound, type UpDownRoundDetail, type UpDownRoundSummary, type UpDownRoundsList, type UpDownSideStr, type UpDownUserBet, type UpdateProfilePayload, type UpdateProfileResult, VestingModule, type WalletTransaction, type WhitelistEntry };

@@ -49,6 +49,30 @@ const pulse = await client.api.getPulse();
 console.log(`${pulse.stats.tokens} tokens, ${pulse.stats.predictionMarkets} markets`);
 ```
 
+## Injected Wallets (Privy, Web3Auth, Magic, browser wallets, MPC)
+
+If you don't hold a raw private key — embedded-wallet providers, browser extensions, MPC custody — pass a viem `WalletClient` instead of `privateKey`. The full `create()` flow (SIWE auth, API-key provisioning) and all write modules work through the injected signer.
+
+```typescript
+import { createWalletClient, custom } from 'viem';
+import { bsc } from 'viem/chains';
+import { BasisClient } from 'basis-sdk';
+
+// e.g. Privy: const provider = await wallet.getEthereumProvider();
+const walletClient = createWalletClient({
+  account: walletAddress,      // must be set
+  chain: bsc,
+  transport: custom(provider), // any EIP-1193 provider
+});
+
+const client = await BasisClient.create({ walletClient });
+```
+
+Notes:
+- `privateKey` and `walletClient` are mutually exclusive (`privateKey` wins if both are set).
+- Gasless mode (MegaFuel) is unavailable with an injected signer — the provider owns transaction submission, so gas is paid normally.
+- `sharp` (native image processing) is an optional dependency and is loaded lazily, so the SDK stays importable in browser / React Native bundles. Only `client.api.uploadImageFromUrl()` requires it (Node.js only) — in other runtimes resize client-side and call `uploadImage()` directly.
+
 ## Read-Only Mode
 
 ```typescript

@@ -1,4 +1,6 @@
-import sharp from 'sharp';
+// NOTE: `sharp` (native Node image lib) is loaded lazily inside
+// uploadImageFromUrl so the SDK stays importable in non-Node runtimes
+// (React Native / browsers), where image processing isn't available.
 import { BasisClient } from './BasisClient';
 
 // ---------------------------------------------------------------------------
@@ -17,6 +19,14 @@ export interface CursorPagination {
   nextCursor: string | null;
   hasMore: boolean;
 }
+
+/**
+ * Valid Reef feed sections.
+ * - `agent` — agent-only feed (gated by ACS threshold).
+ * - `mixed` — the general / everyone feed.
+ * The legacy `human` section was retired; `POST /api/reef/post` rejects it.
+ */
+export type ReefSection = 'agent' | 'mixed';
 
 export interface Token {
   id: number;
@@ -597,7 +607,16 @@ export class BasisAPI {
     const arrayBuffer = await response.arrayBuffer();
     const inputBuffer = Buffer.from(arrayBuffer);
 
-    // 2. Resize to 512x512 center-crop and convert to WebP
+    // 2. Resize to 512x512 center-crop and convert to WebP (Node-only path)
+    let sharp: any;
+    try {
+      sharp = (await import('sharp')).default;
+    } catch {
+      throw new Error(
+        'uploadImageFromUrl requires the "sharp" package (Node.js only). ' +
+        'In React Native / browser environments, resize the image client-side and call uploadImage() directly.',
+      );
+    }
     const webpBuffer = await sharp(inputBuffer)
       .resize(512, 512, { fit: 'cover', position: 'centre' })
       .webp({ quality: 90 })
@@ -1608,7 +1627,7 @@ export class BasisAPI {
 
   /** GET /api/reef/feed — paginated social feed. */
   async getReefFeed(options?: {
-    section?: string;
+    section?: ReefSection;
     sort?: string;
     period?: string;
     q?: string;
@@ -1634,7 +1653,7 @@ export class BasisAPI {
 
   /** GET /api/reef/feed/{wallet} — posts by a specific wallet. */
   async getReefFeedByWallet(wallet: string, options?: {
-    section?: string;
+    section?: ReefSection;
     limit?: number;
     offset?: number;
   }): Promise<{ data: unknown[]; pagination: { total: number; limit: number; offset: number } }> {
@@ -1664,7 +1683,7 @@ export class BasisAPI {
   }
 
   /** GET /api/reef/highlights — top 10 posts by score in last 24h. */
-  async getReefHighlights(section?: string): Promise<{ data: unknown[] }> {
+  async getReefHighlights(section?: ReefSection): Promise<{ data: unknown[] }> {
     const params = new URLSearchParams();
     if (section) params.set('section', section);
     const qs = params.toString();
@@ -1681,9 +1700,9 @@ export class BasisAPI {
   // Reef — authenticated endpoints (session or API key)
   // -----------------------------------------------------------------------
 
-  /** POST /api/reef/post — create a new Reef post. */
+  /** POST /api/reef/post — create a new Reef post. Section must be `agent` or `mixed`. */
   async createReefPost(options: {
-    section: string;
+    section: ReefSection;
     title: string;
     body?: string;
   }): Promise<{ success: boolean; post: Record<string, unknown> }> {

@@ -5,7 +5,6 @@ import { bsc } from "viem/chains";
 import { SiweMessage } from "siwe";
 
 // src/api.ts
-import sharp from "sharp";
 var UPDOWN_TOKENS = ["btc", "eth", "bnb", "cake", "doge"];
 function validateUpDownToken(token) {
   if (typeof token !== "string" || !UPDOWN_TOKENS.includes(token)) {
@@ -186,6 +185,14 @@ var BasisAPI = class {
     }
     const arrayBuffer = await response.arrayBuffer();
     const inputBuffer = Buffer.from(arrayBuffer);
+    let sharp;
+    try {
+      sharp = (await import("sharp")).default;
+    } catch {
+      throw new Error(
+        'uploadImageFromUrl requires the "sharp" package (Node.js only). In React Native / browser environments, resize the image client-side and call uploadImage() directly.'
+      );
+    }
     const webpBuffer = await sharp(inputBuffer).resize(512, 512, { fit: "cover", position: "centre" }).webp({ quality: 90 }).toBuffer();
     const filename = contractAddress ? `${contractAddress}.webp` : `image_${Date.now()}.webp`;
     return this.uploadImage(webpBuffer, filename, purpose, contractAddress);
@@ -947,7 +954,7 @@ var BasisAPI = class {
   // -----------------------------------------------------------------------
   // Reef — authenticated endpoints (session or API key)
   // -----------------------------------------------------------------------
-  /** POST /api/reef/post — create a new Reef post. */
+  /** POST /api/reef/post — create a new Reef post. Section must be `agent` or `mixed`. */
   async createReefPost(options) {
     const res = await this.fetchWithAuth("/api/reef/post", {
       method: "POST",
@@ -2908,7 +2915,11 @@ var FactoryModule = class {
     this.factoryAddress = factoryAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   /**
    * Internal: creates a token on-chain. Use createTokenWithMetadata() instead.
@@ -3811,7 +3822,11 @@ var TradingModule = class {
     this.swapAddress = swapAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   /**
    * Automatically approves the token to be spent by the SWAP contract.
@@ -5847,7 +5862,11 @@ var PredictionMarketsModule = class {
     this.marketTradingAddress = marketTradingAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   /**
    * Returns the contract's minimum seed amount required to create a market,
@@ -7039,7 +7058,11 @@ var LoansModule = class {
     this.loanHubAddress = loanHubAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   async approveIfNeeded(tokenAddress, spender, amount) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -8676,7 +8699,11 @@ var VestingModule = class {
     this.vestingAddress = vestingAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   async approveIfNeeded(tokenAddress, spender, amount) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -10188,7 +10215,11 @@ var StakingModule = class {
     this.stakingAddress = stakingAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   /** Reads the caller's active staking loan: { hubId, loanHubAddress }. Throws if none. */
   async _getActiveStakingLoan(user) {
@@ -11631,7 +11662,11 @@ var MarketResolverModule = class {
     this.resolverAddress = resolverAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   async approveIfNeeded(tokenAddress, spender, amount) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -13888,7 +13923,11 @@ var PrivateMarketsModule = class {
     }
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   /**
    * Returns the contract's minimum seed amount required to create a public
@@ -16620,7 +16659,11 @@ var TaxesModule = class {
     this.taxesAddress = taxesAddress;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   /**
    * Returns the dev's accumulated USDB earnings on a specific token, in 18-dec wei.
@@ -16846,7 +16889,11 @@ var AgentIdentityModule = class {
     this.registryAddress = IDENTITY_REGISTRY;
   }
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   /**
    * Build the on-chain metadata JSON for an agent.
@@ -18641,7 +18688,11 @@ var UpDownAssetModule = class {
   }
   // --- Internals ---
   async _syncTx(txHash) {
-    await this.client.api.syncTransaction(txHash);
+    try {
+      await this.client.api.syncTransaction(txHash);
+    } catch (e) {
+      console.warn(`[basis-sdk] post-tx sync failed for ${txHash}:`, e?.message);
+    }
   }
   async _approveUsdbIfNeeded(amount) {
     if (!this.client.walletClient || !this.client.walletClient.account) {
@@ -19433,6 +19484,13 @@ var BasisClient = class _BasisClient {
           transport: http(rpcUrl)
         });
       }
+    } else if (options.walletClient) {
+      if (!options.walletClient.account) {
+        throw new Error(
+          "Injected walletClient must have an account set. Build it with createWalletClient({ account, chain: bsc, transport: custom(provider) })."
+        );
+      }
+      this.walletClient = options.walletClient;
     }
     if (options.apiKey) {
       this._apiKey = options.apiKey;
@@ -19471,7 +19529,8 @@ var BasisClient = class _BasisClient {
    * Async factory method that creates a fully initialized BasisClient.
    *
    * - Validates custom RPC URL by checking chainId === 56 (BSC).
-   * - If a privateKey is provided and no apiKey: authenticates via SIWE and auto-provisions an API key.
+   * - If a signer is provided (privateKey or injected walletClient) and no
+   *   apiKey: authenticates via SIWE and auto-provisions an API key.
    * - If an apiKey is provided: stores it directly.
    */
   static async create(options = {}) {
@@ -19493,9 +19552,9 @@ var BasisClient = class _BasisClient {
         );
       }
     }
-    if (options.privateKey) {
+    if (options.privateKey || options.walletClient) {
       if (!client.walletClient?.account) {
-        throw new Error("WalletClient was not initialized despite privateKey being provided.");
+        throw new Error("WalletClient was not initialized despite a signer being provided.");
       }
       const address = client.walletClient.account.address;
       await client.authenticate(address);
@@ -19549,7 +19608,7 @@ ${lines.join("\n")}`
         );
       }
     }
-    if (options.agent && options.privateKey) {
+    if (options.agent && client.walletClient) {
       const agentConfig = typeof options.agent === "object" ? options.agent : void 0;
       try {
         await client.agent.registerAndSync(agentConfig);
