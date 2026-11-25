@@ -160,6 +160,7 @@ Wrappers for the API's OpenAPI spec, in ten domains: auth, content, tokens, mark
 
 - Platform: https://launchonbasis.com
 - API reference: https://launchonbasis.com/api-docs
+- Report a bug: https://launchonbasis.com/bugreport, or `client.api.submitBugReport(...)`
 
 ## License
 
